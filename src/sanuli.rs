@@ -6,19 +6,22 @@ use std::rc::Rc;
 use chrono::NaiveDate;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
+
+#[cfg(web_sys_unstable_apis)]
 use web_sys::{window, Window};
 
 pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::game;
-use crate::game::{
-    Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH,
-    SUCCESS_EMOJIS,
-};
+use crate::game::{Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists,
+    DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
 };
+
+#[cfg(web_sys_unstable_apis)]
+use crate::manager::Theme;
 
 const DAILY_WORDS: &str = include_str!("../daily-words.txt");
 
@@ -567,6 +570,7 @@ impl Game for Sanuli {
         self.guesses[self.current_guess].pop();
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_emojis(&self, theme: Theme) -> Option<String> {
         let mut message = String::new();
 
@@ -609,6 +613,7 @@ impl Game for Sanuli {
         Some(message)
     }
 
+    #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
         let game_str = format!(
             "{}|{}",

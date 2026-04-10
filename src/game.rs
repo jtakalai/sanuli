@@ -6,13 +6,11 @@ pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList,
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList
 };
 
-pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏", ":3"];
-pub const DEFAULT_WORD_LENGTH: usize = 5;
-pub const DEFAULT_MAX_GUESSES: usize = 6;
-pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
+#[cfg(web_sys_unstable_apis)]
+use crate::manager::Theme;
 
 pub trait Game {
     fn title(&self) -> String;
@@ -21,7 +19,9 @@ pub trait Game {
     fn submit_guess(&mut self);
     fn push_character(&mut self, character: char);
     fn pop_character(&mut self);
+    #[cfg(web_sys_unstable_apis)]
     fn share_emojis(&self, theme: Theme) -> Option<String>;
+    #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String>;
     fn reveal_hidden_tiles(&mut self);
     fn reset(&mut self);
