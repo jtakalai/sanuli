@@ -625,6 +625,7 @@ impl Component for App {
                                     total_played={self.manager.total_played}
                                     total_solved={self.manager.total_solved}
                                     monuli_auto_sort={monuli_auto_sort}
+                                    monuli_n={self.manager.last_monuli_n}
                                 />
                             }
                         } else {
@@ -645,6 +646,7 @@ impl Component for App {
                     max_streak={self.manager.max_streak}
                     total_played={self.manager.total_played}
                     total_solved={self.manager.total_solved}
+                    monuli_n={self.manager.last_monuli_n}
                 />
             }
         }

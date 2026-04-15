@@ -141,6 +141,8 @@ pub struct MenuModalProps {
 
     #[prop_or_default]
     pub monuli_auto_sort: bool,
+
+    pub monuli_n: usize,
 }
 
 #[function_component(MenuModal)]
@@ -159,9 +161,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_game_mode_quadruple =
         onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
 
-    let monuli_n = use_state(|| {
-        if let GameMode::Monuli(n) = props.game_mode { n } else { 8usize }
-    });
+    let monuli_n = use_state(|| props.monuli_n);
     let change_game_mode_monuli = {
         let callback = callback.clone();
         let monuli_n = monuli_n.clone();
@@ -179,9 +179,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                 if let Ok(select) = target.dyn_into::<web_sys::HtmlSelectElement>() {
                     if let Ok(n) = select.value().parse::<usize>() {
                         monuli_n.set(n);
-                        if matches!(game_mode, GameMode::Monuli(_)) {
-                            callback.emit(Msg::ChangeGameMode(GameMode::Monuli(n)));
-                        }
+                        callback.emit(Msg::ChangeGameMode(GameMode::Monuli(n)));
                     }
                 }
             }

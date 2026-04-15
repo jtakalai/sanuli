@@ -25,6 +25,7 @@ pub const DEFAULT_WORD_LENGTH: usize = 5;
 pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 pub const DAILY_WORD_LEN: usize = 5;
+pub const DEFAULT_MONULI_N: usize = 10;
 
 pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏", ":3"];
 
@@ -221,6 +222,7 @@ pub struct Manager {
     pub current_word_list: WordList,
     pub current_word_length: usize,
     pub allow_profanities: bool,
+    pub last_monuli_n: usize,
 
     pub previous_game: (GameMode, WordList, usize),
 
@@ -245,6 +247,7 @@ impl Default for Manager {
             current_word_list: WordList::default(),
             current_word_length: DEFAULT_WORD_LENGTH,
             allow_profanities: DEFAULT_ALLOW_PROFANITIES,
+            last_monuli_n: DEFAULT_MONULI_N,
 
             previous_game: (
                 GameMode::default(),
@@ -319,12 +322,15 @@ impl Manager {
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
-                DEFAULT_MAX_GUESSES,
+                DEFAULT_MONULI_N,
                 DEFAULT_ALLOW_PROFANITIES,
                 word_lists.clone(),
             );
 
             let manager = Self {
+                current_game_mode: GameMode::Monuli(DEFAULT_MONULI_N),
+                current_word_list: WordList::Common,
+                last_monuli_n: DEFAULT_MONULI_N,
                 game: Some(Box::new(game)),
                 word_lists,
                 ..Self::default()
@@ -456,10 +462,16 @@ impl Manager {
             self.current_word_list = WordList::default();
         }
 
+        if let GameMode::Monuli(n) = new_mode {
+            self.last_monuli_n = n;
+        }
+
         self.current_game_mode = new_mode;
         self.switch_active_game();
         let _res = self.persist();
-        let _res = self.game.as_ref().unwrap().persist();
+        if let Some(game) = self.game.as_ref() {
+            let _res = game.persist();
+        }
     }
 
     pub fn change_word_list(&mut self, new_list: WordList) {
