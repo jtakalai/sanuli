@@ -228,6 +228,12 @@ pub struct Monuli {
     /// Cursor position in the list view (index into word_order()). None = nothing selected.
     #[serde(skip)]
     pub list_cursor: Option<usize>,
+    /// After switching from overview to list, scroll to center this word_order index. Consumed after render.
+    #[serde(skip)]
+    pub list_scroll_to: Option<usize>,
+    /// After keyboard cursor move, ensure this word_order index is visible with margins. Consumed after render.
+    #[serde(skip)]
+    pub list_ensure_visible: Option<usize>,
     /// When true, unsolved words in word_order are sorted by compact_row quality after each guess.
     #[serde(default = "default_auto_sort")]
     pub auto_sort: bool,
@@ -467,6 +473,8 @@ impl Monuli {
             selected_word_index: None,
             show_overview: n_words > 20,
             list_cursor: None,
+            list_scroll_to: None,
+            list_ensure_visible: None,
             auto_sort: true,
         }
     }

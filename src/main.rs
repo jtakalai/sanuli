@@ -45,7 +45,8 @@ pub enum Msg {
     RevealHiddenTiles,
     ResetGame,
     SelectMonuliWord(Option<usize>),
-    MonuliSetOverview(bool),
+    /// (show, optional word_order index to focus when closing)
+    MonuliSetOverview(bool, Option<usize>),
     ArrowLeft,
     ArrowRight,
     ArrowUp,
@@ -78,6 +79,22 @@ impl Component for App {
     }
 
     fn rendered(&mut self, ctx: &Context<Self>, first_render: bool) {
+        if let Some(g) = self.manager.game.as_mut() {
+            if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                if let Some(target) = monuli.list_scroll_to.take() {
+                    scroll_monuli_word_list_to(target);
+                } else if let Some(cursor) = monuli.list_ensure_visible.take() {
+                    ensure_cursor_visible_in_list(cursor);
+                }
+                
+                if monuli.selected_word_index.is_some() {
+                    ensure_sanuli_current_visible();
+                }
+            }
+        }
+
+        setup_overview_hover();
+
         if !first_render {
             return;
         }
@@ -249,11 +266,17 @@ impl Component for App {
                     g.set_monuli_selected_word(idx);
                 }
             }
-            Msg::MonuliSetOverview(show) => {
+            Msg::MonuliSetOverview(show, focus_idx) => {
                 if let Some(g) = self.manager.game.as_mut() {
                     if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
                         monuli.show_overview = show;
                         monuli.selected_word_index = None;
+                        if !show {
+                            if let Some(wo_idx) = focus_idx {
+                                monuli.list_cursor = Some(wo_idx);
+                                monuli.list_scroll_to = Some(wo_idx);
+                            }
+                        }
                     }
                 }
             }
@@ -289,14 +312,17 @@ impl Component for App {
                                 order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
                             };
                             if n > 0 {
-                                monuli.list_cursor = Some(match monuli.list_cursor {
+                                let new_cursor = match monuli.list_cursor {
                                     None => n - 1,
                                     Some(0) => n - 1,
                                     Some(c) => (c - 1).min(n - 1),
-                                });
+                                };
+                                monuli.list_cursor = Some(new_cursor);
+                                monuli.list_ensure_visible = Some(new_cursor);
                             }
                             if monuli.show_overview {
                                 monuli.show_overview = false;
+                                monuli.list_scroll_to = monuli.list_cursor;
                             }
                         }
                     }
@@ -312,14 +338,17 @@ impl Component for App {
                                 order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
                             };
                             if n > 0 {
-                                monuli.list_cursor = Some(match monuli.list_cursor {
+                                let new_cursor = match monuli.list_cursor {
                                     None => 0,
                                     Some(c) if c >= n - 1 => 0,
                                     Some(c) => c + 1,
-                                });
+                                };
+                                monuli.list_cursor = Some(new_cursor);
+                                monuli.list_ensure_visible = Some(new_cursor);
                             }
                             if monuli.show_overview {
                                 monuli.show_overview = false;
+                                monuli.list_scroll_to = monuli.list_cursor;
                             }
                         }
                     }
@@ -428,6 +457,18 @@ impl Component for App {
                                         let row_width = word_length * cell_size + (word_length - 1) * 2;
                                         let style_var = format!("--overview-cell-size: {}px; --overview-row-width: {}px;", cell_size, row_width);
 
+                                        // Transpose word_order into column-major order for 4-column grid
+                                        let cols = 4usize;
+                                        let k = (n_words + cols - 1) / cols;
+                                        let mut transposed: Vec<(Option<usize>, usize)> = Vec::with_capacity(k * cols);
+                                        for row in 0..k {
+                                            for col in 0..cols {
+                                                let src = col * k + row;
+                                                let wo_idx = word_order.get(src).copied();
+                                                transposed.push((wo_idx, src));
+                                            }
+                                        }
+
                                         html! {
                                             <div class="monuli-list-view">
                                                 <div class={format!("row-{}", word_length)}>
@@ -436,17 +477,24 @@ impl Component for App {
                                                         html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
                                                     }).collect::<Html>() }
                                                 </div>
-                                                <div class="monuli-overview-grid" style={style_var}>
-                                                    { word_order.iter().map(|&word_index| {
-                                                        let (compact, _extra) = monuli.compact_row(word_index);
-                                                        let onselect = link.callback(move |e: MouseEvent| {
-                                                            e.prevent_default();
-                                                            Msg::SelectMonuliWord(Some(word_index))
-                                                        });
-                                                        html! {
-                                                            <div class="overview-row" onmousedown={onselect}>
-                                                                { compact.iter().map(&render_overview_cell).collect::<Html>() }
-                                                            </div>
+                                                <div class="monuli-overview-grid" style={style_var}
+                                                     data-k={k.to_string()} data-cols={cols.to_string()} data-n={n_words.to_string()}>
+                                                    { transposed.iter().map(|&(opt_word_index, wo_idx)| {
+                                                        if let Some(_word_index) = opt_word_index {
+                                                            let (compact, _extra) = monuli.compact_row(_word_index);
+                                                            let onclick = link.callback(move |e: MouseEvent| {
+                                                                e.prevent_default();
+                                                                Msg::MonuliSetOverview(false, Some(wo_idx))
+                                                            });
+                                                            html! {
+                                                                <div class="overview-row"
+                                                                     data-wo={wo_idx.to_string()}
+                                                                     onmousedown={onclick}>
+                                                                    { compact.iter().map(&render_overview_cell).collect::<Html>() }
+                                                                </div>
+                                                            }
+                                                        } else {
+                                                            html! { <div class="overview-row overview-row-empty"></div> }
                                                         }
                                                     }).collect::<Html>() }
                                                 </div>
@@ -470,7 +518,7 @@ impl Component for App {
                                         let has_overview = n_words > 10;
                                         let on_show_all = link.callback(move |e: MouseEvent| {
                                             e.prevent_default();
-                                            Msg::MonuliSetOverview(true)
+                                            Msg::MonuliSetOverview(true, None)
                                         });
 
                                         html! {
@@ -661,6 +709,198 @@ impl Component for App {
                     total_solved={self.manager.total_solved}
                 />
             }
+        }
+    }
+}
+
+/// Scroll `.monuli-word-list` so that the row at `target_pos` is centered.
+fn scroll_monuli_word_list_to(target_pos: usize) {
+    let window = match window() {
+        Some(w) => w,
+        None => return,
+    };
+    let document = match window.document() {
+        Some(d) => d,
+        None => return,
+    };
+    if let Some(list_el) = document.query_selector(".monuli-word-list").ok().flatten() {
+        let children = list_el.children();
+        if let Some(target_el) = children.item(target_pos as u32) {
+            let container_height = list_el.client_height() as f64;
+            let el = target_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+            let row_top = el.offset_top() as f64 - list_el.dyn_ref::<web_sys::HtmlElement>().unwrap().offset_top() as f64;
+            let row_height = el.offset_height() as f64;
+            let scroll_to = (row_top - container_height / 2.0 + row_height / 2.0).max(0.0);
+            list_el.set_scroll_top(scroll_to as i32);
+        }
+    }
+}
+
+/// Ensure `.monuli-word-list` scroll keeps cursor visible with margins:
+/// scroll down if cursor goes past the 8th visible row, up if above the 3rd.
+fn ensure_cursor_visible_in_list(cursor_pos: usize) {
+    let window = match window() {
+        Some(w) => w,
+        None => return,
+    };
+    let document = match window.document() {
+        Some(d) => d,
+        None => return,
+    };
+    if let Some(list_el) = document.query_selector(".monuli-word-list").ok().flatten() {
+        let children = list_el.children();
+        if let Some(target_el) = children.item(cursor_pos as u32) {
+            let list_html = list_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+            let el = target_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+            let row_top = el.offset_top() as f64 - list_html.offset_top() as f64;
+            let row_height = el.offset_height() as f64;
+            let scroll_top = list_el.scroll_top() as f64;
+            let container_height = list_el.client_height() as f64;
+
+            let row_bottom = row_top + row_height;
+            let visible_top = scroll_top;
+            let visible_bottom = scroll_top + container_height;
+
+            let margin_top_rows = 2.0 * row_height;
+            let margin_bottom_rows = 2.0 * row_height;
+
+            if row_top < visible_top + margin_top_rows {
+                let new_scroll = (row_top - margin_top_rows).max(0.0);
+                list_el.set_scroll_top(new_scroll as i32);
+            } else if row_bottom > visible_bottom - margin_bottom_rows {
+                let new_scroll = row_bottom + margin_bottom_rows - container_height;
+                list_el.set_scroll_top(new_scroll as i32);
+            }
+        }
+    }
+}
+
+/// Ensure the currently active row in Monuli single-word view is visible.
+fn ensure_sanuli_current_visible() {
+    let window = match window() {
+        Some(w) => w,
+        None => return,
+    };
+    let document = match window.document() {
+        Some(d) => d,
+        None => return,
+    };
+    if let Some(container_el) = document.query_selector(".monuli-sanuli-view").ok().flatten() {
+        if let Some(current_tile) = document.query_selector(".monuli-sanuli-view .current").ok().flatten() {
+            if let Some(row_el) = current_tile.parent_element() {
+                let container = container_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+                let row = row_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+                
+                let row_top = row.offset_top() as f64 - container.offset_top() as f64;
+                let row_height = row.offset_height() as f64;
+                let scroll_top = container.scroll_top() as f64;
+                let container_height = container.client_height() as f64;
+
+                let row_bottom = row_top + row_height;
+                let visible_top = scroll_top;
+                let visible_bottom = scroll_top + container_height;
+
+                let margin = row_height * 0.5;
+
+                if row_top < visible_top + margin {
+                    let new_scroll = (row_top - margin).max(0.0);
+                    container.set_scroll_top(new_scroll as i32);
+                } else if row_bottom > visible_bottom - margin {
+                    let new_scroll = row_bottom + margin - container_height;
+                    container.set_scroll_top(new_scroll as i32);
+                }
+            }
+        }
+    }
+}
+
+/// Set up hover highlighting on the overview grid via direct DOM manipulation.
+/// Runs every render; uses a data attribute to avoid re-attaching listeners.
+fn setup_overview_hover() {
+    let document = match window().and_then(|w| w.document()) {
+        Some(d) => d,
+        None => return,
+    };
+    let grid = match document.query_selector(".monuli-overview-grid").ok().flatten() {
+        Some(g) => g,
+        None => return,
+    };
+    if grid.get_attribute("data-hover-init").is_some() {
+        return;
+    }
+    grid.set_attribute("data-hover-init", "1").ok();
+
+    let grid_el = grid.clone();
+    let on_enter: Closure<dyn Fn(web_sys::MouseEvent)> = Closure::new(move |e: web_sys::MouseEvent| {
+        let target = match e.target() {
+            Some(t) => t,
+            None => return,
+        };
+        let row_el = match target.dyn_ref::<web_sys::Element>()
+            .and_then(|el| el.closest(".overview-row").ok().flatten()) {
+            Some(r) => r,
+            None => return,
+        };
+        let wo: usize = match row_el.get_attribute("data-wo").and_then(|s| s.parse().ok()) {
+            Some(v) => v,
+            None => return,
+        };
+        let k: usize = grid_el.get_attribute("data-k").and_then(|s| s.parse().ok()).unwrap_or(1);
+        let cols: usize = grid_el.get_attribute("data-cols").and_then(|s| s.parse().ok()).unwrap_or(4);
+        let n: usize = grid_el.get_attribute("data-n").and_then(|s| s.parse().ok()).unwrap_or(0);
+
+        let hover_col = wo / k;
+        let hover_row_in_col = wo % k;
+        let col_len = if hover_col < cols - 1 || n % k == 0 { k } else { n % k };
+
+        clear_overview_highlights(&grid_el);
+        for offset in 0..=4usize {
+            let up = (hover_row_in_col + col_len - (offset % col_len)) % col_len;
+            let down = (hover_row_in_col + offset) % col_len;
+            for idx in [hover_col * k + up, hover_col * k + down] {
+                let selector = format!(".overview-row[data-wo=\"{}\"]", idx);
+                if let Some(el) = grid_el.query_selector(&selector).ok().flatten() {
+                    add_css_class(&el, "overview-row-highlight");
+                }
+            }
+        }
+        add_css_class(&row_el, "overview-row-hovered");
+    });
+
+    let grid_el2 = grid.clone();
+    let on_leave: Closure<dyn Fn(web_sys::MouseEvent)> = Closure::new(move |_: web_sys::MouseEvent| {
+        clear_overview_highlights(&grid_el2);
+    });
+
+    grid.add_event_listener_with_callback("mouseover", on_enter.as_ref().unchecked_ref()).ok();
+    grid.add_event_listener_with_callback("mouseleave", on_leave.as_ref().unchecked_ref()).ok();
+    on_enter.forget();
+    on_leave.forget();
+}
+
+fn add_css_class(el: &web_sys::Element, class: &str) {
+    let current = el.get_attribute("class").unwrap_or_default();
+    if !current.split_whitespace().any(|c| c == class) {
+        el.set_attribute("class", &format!("{} {}", current, class)).ok();
+    }
+}
+
+fn remove_css_class(el: &web_sys::Element, class: &str) {
+    if let Some(current) = el.get_attribute("class") {
+        let new: String = current.split_whitespace()
+            .filter(|c| *c != class)
+            .collect::<Vec<_>>()
+            .join(" ");
+        el.set_attribute("class", &new).ok();
+    }
+}
+
+fn clear_overview_highlights(grid: &web_sys::Element) {
+    let children = grid.children();
+    for i in 0..children.length() {
+        if let Some(child) = children.item(i) {
+            remove_css_class(&child, "overview-row-highlight");
+            remove_css_class(&child, "overview-row-hovered");
         }
     }
 }
