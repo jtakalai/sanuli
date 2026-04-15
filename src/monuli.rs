@@ -183,7 +183,6 @@ pub struct MonuliWordState {
     pub known_states: Vec<KnownStates>,
     pub known_counts: Vec<KnownCounts>,
     /// Guess index at which this word was solved (None if unsolved).
-    #[serde(default)]
     pub solved_at: Option<usize>,
 }
 
@@ -209,39 +208,17 @@ pub struct Monuli {
     #[serde(skip)]
     word_lists: Rc<WordLists>,
     /// When Some(i), sanuli view for word i; input applies only to that word. None = list view.
-    #[serde(skip)]
     pub selected_word_index: Option<usize>,
-    /// When true and selected_word_index is None, show zoomed-out overview instead of list view.
-    #[serde(skip)]
+    /// When true and selected_word_index is None, show overview instead of list view.
     pub show_overview: bool,
     /// Cursor position in the list view (index into word_order()). None = nothing selected.
-    #[serde(skip)]
     pub list_cursor: Option<usize>,
-    /// After switching from overview to list, scroll to center this word_order index. Consumed after render.
-    #[serde(skip)]
+    /// After switching from overview to list, scroll to center this word_order index.
     pub list_scroll_to: Option<usize>,
-    /// After keyboard cursor move, ensure this word_order index is visible with margins. Consumed after render.
-    #[serde(skip)]
+    /// After keyboard cursor move, ensure this word_order index is visible.
     pub list_ensure_visible: Option<usize>,
-    /// When true, unsolved words in word_order are sorted by compact_row quality after each guess.
-    #[serde(default = "default_auto_sort")]
+    /// When true, unsolved words in word_order are sorted by compact_row quality.
     pub auto_sort: bool,
-}
-
-fn default_auto_sort() -> bool {
-    true
-}
-
-impl Default for Monuli {
-    fn default() -> Self {
-        Self::new(
-            WordList::default(),
-            DEFAULT_WORD_LENGTH,
-            10,
-            DEFAULT_ALLOW_PROFANITIES,
-            Rc::new(HashMap::new()),
-        )
-    }
 }
 
 impl Monuli {
