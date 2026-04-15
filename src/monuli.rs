@@ -563,9 +563,9 @@ impl Game for Monuli {
     }
     fn title(&self) -> String {
         if self.streak > 0 {
-            format!("{}:n monuli — Putki: {}", self.n_words, self.streak)
+            format!("{}:n monuli ({}/{}) — Putki: {}", self.n_words, self.current_guess + 1, self.max_guesses(), self.streak)
         } else {
-            format!("{}:n monuli", self.n_words)
+            format!("{}:n monuli ({}/{})", self.n_words, self.current_guess + 1, self.max_guesses())
         }
     }
     fn next_word(&mut self) {
