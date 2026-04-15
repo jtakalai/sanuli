@@ -178,7 +178,7 @@ impl fmt::Display for Theme {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Copy)]
 pub enum CharacterCount {
     AtLeast(usize),
     Exactly(usize),

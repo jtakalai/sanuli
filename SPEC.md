@@ -109,9 +109,33 @@ Jotta vältetään se, että keltainen olisi hämäävästi väärässä ruudu
 
 Monulinäkymässä on hämäävää, jos keltaisella näkyy monta kertaa sama kirjain, vaikka sitä ei sanassa ole kuin kerran. Jos siis arvausrivillä on sama kirjain monta kertaa keltaisella, mutta yhdessäkään arvauksessa ei ole havaittu kirjainta niin montaa kertaa nimenomaan keltaisena, niin silloin kirjaimen tulee olla ruskea. Toisin sanoen monulinäkymässä useammin ei-vihreänä esiintyvä kirjain on ruskea, ellei ole ainakin yhtä arvausta, missä kirjain olisi ollut keltaisena yhtä monta kertaa.
 
+Täytyy kuitenkin erottaa kaksi tilannetta: kirjain on nähty mustana taikka ei. Jos kirjain on nähty mustana, niin tiedetään, montako niitä voi enintään olla. Jos kirjain on nähty vihreänä/keltaisena muttei mustana, niin silloin niitä voi olla sanassa enemmänkin.
+
+Semmoinen voisi vielä olla hyvä periaate, että vihreiden+keltaisten määrä näyttää, montako kirjaimia on, JOS niiden määrä tiedetään (eli on nähty kirjain myös mustana, koska se asettaa ylärajan havaitulle määrälle). Loput "keltaiset" olisivat sitten ruskeita. Jos taas ylärajaa ei ole tiedossa, silloin otetaan "esitettäväksi määräksi" se, montako kappaletta kirjainta on enintään nähty samassa arvauksessa. Siispä (enintään) niin monta vihreää+keltaista, loput ruskeita.
+
+Huomattavaa on myös, että ennen kaikkea keltaisten+vihreiden suurimmalla havaitulla MÄÄRÄLLÄ yhdessä arvauksessa on väliä. Sen sijaan keltaiset ruudut eivät ole eri asia kuin mustat siltä kannalta, että niissä kirjainta ei ole. Kirjaimen sijainnin kannalta on vain kolmenlaisia ruutuja: vihreitä, keltaisia/mustia, sekä tuntemattomia (CharacterState).
+
+Tarkennus: jos sanassa ei ole enää tuntemattomia ruutuja kirjaimelle X, niin silloin X:ää ei näytetä keltaisena/ruskeana ollenkaan. Logiikka on se, että X on silloin suljettu pois kaikista ei-vihreistä ruuduista, eikä sitä niin ollen voi enää esiintyä sanassa, jolloin sen näyttäminen olisi turhaa ja hämäävää.
+
 **Esimerkki 1.3.1**: oikea sana LAHTI
 - arvaus 1: KAALI (L väärässä paikassa 4)
 - arvaus 2: PALVI (L väärässä paikassa 3)
 - ennen 1.3-korjausta tiivistelmärivi olisi: tyhjä, vihreä A, keltainen L, keltainen L, vihreä I
 - korjauksen jälkeen pitäisi tiivistelmärivin olla: tyhjä, vihreä A, ruskea L, ruskea L, vihreä I
 - syy: L on kahdesti ei-vihreänä tiivistelmärivissä, mutta on vain arvauksia, missä on 1 keltainen L (vähemmän kuin 2)
+
+Keltaisena tai ruskeana esittäminen on kirjainkohtaista niiden ruutujen joukossa, joissa ei ole vihreää. Toisten kirjainten värit vaikuttavat vain siten, että vihreät sulkevat pois kaikki muut kirjaimet kyseisestä ruudusta.
+
+Käydään läpi tapauksia eri määrillä värejä arvausten ruuduissa:
+- keltaisia 1, vihreitä 0, nähty 1, havaittu väärä: kirjainta on vain 1, näytetään keltainen joko keltaisessa ruudussa tai lisäruudussa (jos vihreän peittämä)
+- keltaisia 1, vihreitä 1, nähty 1, havaittu väärä: kirjainta on vain 1, ei näytetä keltaista
+- keltaisia 1, vihreitä 1, nähty 1, ei havaittu väärää: kirjainta on vähintään 1, näytetään ruskea keltaisessa ruudussa (tai ei jos vihreän peittämä)
+- keltaisia 1, vihreitä 1, nähty 2, havaittu väärä: kirjainta on tasan 2, näytetään keltainen keltaisessa ruudussa tai lisäruudussa (jos vihreän peittämä)
+- keltaisia 1, vihreitä 1, nähty 2, ei havaittu väärää: kirjainta on vähintään 2, näytetään keltainen keltaisessa ruudussa tai lisäruudussa (jos vihreän peittämä)
+- keltaisia 2, vihreitä 0, nähty 1, havaittu väärä: kirjainta on tasan 1, näytetään yksi keltainen ja loput ruskeana
+
+# 1.4: cleanup
+
+Poistetaan overview cursor, joka aiheutti kamalasti noisea main.rs:ään. Monuli-projektin tavoite on koskea Sanuli-koodiin mahdollisimman vähän.
+
+Uudellenkäytetään CharacterStatea jne. sekä samoja termejä: green -> correct, yellow -> present, brown -> absent

@@ -19,7 +19,7 @@ use components::{
     modal::{HelpModal, MenuModal},
 };
 use manager::{GameMode, KeyState, Manager, Theme, WordList};
-use monuli::{CompactCell, Monuli};
+use monuli::{CompactTileState, Monuli};
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -86,7 +86,7 @@ impl Component for App {
                 } else if let Some(cursor) = monuli.list_ensure_visible.take() {
                     ensure_cursor_visible_in_list(cursor);
                 }
-                
+
                 if monuli.selected_word_index.is_some() {
                     ensure_sanuli_current_visible();
                 }
@@ -438,13 +438,13 @@ impl Component for App {
 
                                         let show_letters = n_words <= 20;
 
-                                        let render_overview_cell = move |cell: &CompactCell| -> Html {
+                                        let render_overview_cell = move |cell: &CompactTileState| -> Html {
                                             let (class, letter) = match cell {
-                                                CompactCell::Empty => ("overview-cell overview-cell-empty", None),
-                                                CompactCell::Green(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
-                                                CompactCell::YellowOne(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
-                                                CompactCell::BrownOne(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
-                                                CompactCell::Yellows(_) => ("overview-cell overview-cell-yellow", None),
+                                                CompactTileState::Empty => ("overview-cell overview-cell-empty", None),
+                                                CompactTileState::Green(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
+                                                CompactTileState::Yellow(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
+                                                CompactTileState::Brown(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
+                                                CompactTileState::Yellows(_ys, _bs) => ("overview-cell overview-cell-yellow", None),
                                             };
                                             if let Some(ch) = letter {
                                                 html! { <div class={class}>{ ch }</div> }
@@ -538,32 +538,33 @@ impl Component for App {
                                                 } else { html! {} } }
                                                 <div class="monuli-word-list">
                                                     { word_order.iter().enumerate().map(|(pos, &word_index)| {
-                                                        let (compact, extra) = monuli.compact_row(word_index);
+                                                        let (compact, extras) = monuli.compact_row(word_index);
                                                         let is_first_solved = pos == first_solved && first_solved < word_order.len();
                                                         let onselect = link.callback(move |e: MouseEvent| {
                                                             e.prevent_default();
                                                             Msg::SelectMonuliWord(Some(word_index))
                                                         });
-                                                        let render_cell = |cell: &CompactCell| -> Html {
+                                                        let render_cell = |cell: &CompactTileState| -> Html {
                                                             match cell {
-                                                                CompactCell::Empty => html! {
+                                                                CompactTileState::Empty => html! {
                                                                     <div class="compact-cell compact-cell-empty"></div>
                                                                 },
-                                                                CompactCell::Green(c) => html! {
+                                                                CompactTileState::Green(c) => html! {
                                                                     <div class="compact-cell compact-cell-green">{ c }</div>
                                                                 },
-                                                                CompactCell::YellowOne(c) => html! {
+                                                                CompactTileState::Yellow(c) => html! {
                                                                     <div class="compact-cell compact-cell-yellow">{ c }</div>
                                                                 },
-                                                                CompactCell::BrownOne(c) => html! {
+                                                                CompactTileState::Brown(c) => html! {
                                                                     <div class="compact-cell compact-cell-brown">{ c }</div>
                                                                 },
-                                                                CompactCell::Yellows(chars) => html! {
+                                                                CompactTileState::Yellows(ys, bs) => html! {
                                                                     <div class="compact-cell compact-cell-yellows">
-                                                                        { chars.iter().map(|&(c, brown)| {
-                                                                            let cls = if brown { "compact-cell-brown" } else { "compact-cell-yellow" };
-                                                                            html! { <span class={cls}>{ c }</span> }
-                                                                        }).collect::<Html>() }
+                                                                        { ys.iter().map(|&c| html! {
+                                                                            <span class="compact-cell-yellow">{ c }</span>
+                                                                        }).chain(bs.iter().map(|&c| html! {
+                                                                            <span class="compact-cell-brown">{ c }</span> })).collect::<Html>()
+                                                                        }
                                                                     </div>
                                                                 },
                                                             }
@@ -586,9 +587,23 @@ impl Component for App {
                                                                         { compact.iter().map(&render_cell).collect::<Html>() }
                                                                     </div>
                                                                     <div class="compact-cells-side">
-                                                                        { if let Some(ref ex) = extra {
-                                                                            render_cell(ex)
-                                                                        } else { html! {} } }
+                                                                        { if extras.is_empty() {
+                                                                            html! {}
+                                                                        } else if extras.len() == 1 {
+                                                                            let c = extras[0];
+                                                                            html! {
+                                                                                <div class="compact-cell compact-cell-yellow">{ c }</div>
+                                                                            }
+                                                                        } else {
+                                                                            html! {
+                                                                                <div class="compact-cell compact-cell-yellows">
+                                                                                    { extras.iter().map(|&c| html! {
+                                                                                        <span class="compact-cell-yellow">{ c }</span>
+                                                                                    }).collect::<Html>()
+                                                                                    }
+                                                                                </div>
+                                                                            }
+                                                                        } }
                                                                     </div>
                                                                     { if is_cursor {
                                                                         html! { <div class="monuli-row-arrow">{"→"}</div> }
@@ -790,7 +805,7 @@ fn ensure_sanuli_current_visible() {
             if let Some(row_el) = current_tile.parent_element() {
                 let container = container_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
                 let row = row_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-                
+
                 let row_top = row.offset_top() as f64 - container.offset_top() as f64;
                 let row_height = row.offset_height() as f64;
                 let scroll_top = container.scroll_top() as f64;

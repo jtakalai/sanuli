@@ -13,6 +13,137 @@ use crate::manager::{
     CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList, WordLists,
 };
 
+/// One cell in a compact row (SPEC 1.1). Each tile is either green, one or more yellows/browns, or empty.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CompactTileState {
+    Empty,
+    Green(char),    // TODO: green -> correct
+    Yellow(char),   // TODO: yellow -> present
+    /// SPEC 1.3: brown tile means that a letter would appear in more yellow tiles than is possible
+    Brown(char),    // TODO: brown -> absent
+    /// many yellow or brown letters in this cell; bool = is_brown
+    Yellows(HashSet<char>, HashSet<char>) // yellows, browns
+}
+
+/// SPEC 1.1: Compact one-row summary for a word
+/// Built from guesses only (no knowledge of the correct word).
+/// Greens at correct positions; yellows shown where they appeared.
+/// SPEC 1.2: yellows displaced by greens go to an extra cell if there are no other yellow tiles for that letter.
+/// SPEC 1.3: A brown tile means that letter is NOT in that tile, so it's same as yellow except maybe it's not elsewhere either.
+pub fn compact_row(
+    guesses: &[Vec<(char, TileState)>],
+) -> (Vec<CompactTileState>, Vec<char>) {
+
+    // avoid taking word_length as argument because it can be simply inferred from guesses
+    assert!(!guesses.is_empty(), "compact_row: can't be called with no guesses");
+    let word_length = guesses[0].len();
+    assert!(guesses.iter().all(|r| r.len() == word_length), "compact_row: all guesses must be the same length");
+
+    // find out solved positions first (green), because they exclude other letters in that position
+    let mut green_at: Vec<Option<char>> = vec![None; word_length];
+    let mut seen_count_of: HashMap<char, CharacterCount> = HashMap::new();
+    for row in guesses.iter() {
+        let mut seen_as_absent: HashSet<char> = HashSet::new();
+        let mut current_guess_count_of: HashMap<char, usize> = HashMap::new();
+        for (i, &(c, state)) in row.iter().enumerate() {
+            if state == TileState::Correct {
+                green_at[i] = Some(c);
+            }
+            if state == TileState::Correct || state == TileState::Present {
+                *current_guess_count_of.entry(c).or_insert(0) += 1;
+            }
+            if state == TileState::Absent {
+                seen_as_absent.insert(c);
+            }
+        }
+        for (c, count) in current_guess_count_of {
+            let entry = seen_count_of.entry(c).or_insert(CharacterCount::AtLeast(0));
+            match *entry {
+                CharacterCount::Exactly(_) => continue,
+                CharacterCount::AtLeast(old_count) => {
+                    *entry = if seen_as_absent.contains(&c) {
+                        CharacterCount::Exactly(count)
+                    } else {
+                        CharacterCount::AtLeast(old_count.max(count))
+                    }
+                }
+            }
+        }
+    }
+    let green_count = green_at.iter().filter(|g| g.is_some()).count();
+
+    // collect tested letters in the remaining non-solved positions
+    let mut is_wrong: HashMap<char, Vec<bool>> = HashMap::new();
+    for row in guesses.iter() {
+        for (i, &(c, state)) in row.iter().enumerate() {
+            if green_at[i].is_some() { continue; }
+            if state == TileState::Present || state == TileState::Absent {
+                is_wrong.entry(c).or_insert(vec![false; word_length])[i] = true;
+            }
+        }
+    }
+
+    // resolve yellows and browns
+    let mut yellows_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
+    let mut browns_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
+    let mut extras = Vec::new();
+    for (&c, &n_seen) in seen_count_of.iter() {
+        let correct_count = green_at.iter().filter(|g| **g == Some(c)).count();
+        if let CharacterCount::Exactly(n_exact) = n_seen {
+            assert!(correct_count <= n_exact, "there can't be more greens than exact count");
+            // if greens already account for all occurrences of the letter, no yellows/browns needed
+            if correct_count == n_exact { continue; }
+        }
+        let tried_wrong_count = match is_wrong.get(&c) {
+            None => 0,
+            Some(v) => v.iter().filter(|&&t| t).count(),
+        };
+        // if there's no more unknown cells to try, no yellows/browns needed
+        //   not even extra, because the point of extra is still to be able to place it on an unknown tile
+        if green_count + tried_wrong_count == word_length { continue; }
+
+        // allocate the yellows to tried&wrong cells first, then extra cell; leftover tried cells become brown
+        let seen_count = match n_seen {
+            CharacterCount::Exactly(n) => n,
+            CharacterCount::AtLeast(n) => n,
+        };
+        let mut yellows_left = seen_count.saturating_sub(correct_count);
+        if tried_wrong_count > 0 {
+            let is_wrong_at = is_wrong.get(&c).unwrap();
+            for i in 0..word_length {
+                if is_wrong_at[i] {
+                    if yellows_left > 0 {
+                        yellows_at[i].insert(c); // add yellow
+                        yellows_left -= 1;
+                    } else {
+                        browns_at[i].insert(c);  // add brown
+                    }
+                }
+            }
+        }
+        while yellows_left > 0 {
+            extras.push(c);                      // add yellow to extra cell
+            yellows_left -= 1;
+        }
+    }
+
+    let result_row: Vec<CompactTileState> = (0..word_length).map(|i| {
+        if let Some(c) = green_at[i] {
+            CompactTileState::Green(c)
+        } else if yellows_at[i].is_empty() && browns_at[i].is_empty() {
+            CompactTileState::Empty
+        } else if yellows_at[i].len() == 1 && browns_at[i].is_empty() {
+            CompactTileState::Yellow(*yellows_at[i].iter().next().unwrap())
+        } else if yellows_at[i].is_empty() && browns_at[i].len() == 1 {
+            CompactTileState::Brown(*browns_at[i].iter().next().unwrap())
+        } else {
+            CompactTileState::Yellows(yellows_at[i].clone(), browns_at[i].clone())
+        }
+    }).collect();
+
+    (result_row, extras)
+}
+
 fn get_random_word_excluding(
     word_list: WordList,
     word_length: usize,
@@ -38,152 +169,6 @@ fn get_random_word_excluding(
     }
     let chosen = words.choose(&mut rand::thread_rng()).unwrap();
     Some((*chosen).clone())
-}
-
-/// One cell in a compact row (SPEC 1.1). Per position: either green, or one or more yellows/browns, or empty.
-#[derive(Clone, Debug, PartialEq)]
-pub enum CompactCell {
-    Empty,
-    Green(char),
-    YellowOne(char),
-    /// SPEC 1.3: letter appears more times as yellow than any single guess supports.
-    BrownOne(char),
-    /// 2–4 yellow/brown letters in this cell; bool = is_brown (SPEC 1.3).
-    Yellows(Vec<(char, bool)>),
-}
-
-/// Compact one-row summary for a word (SPEC 1.1 + 1.2).
-/// Built from guesses only (no knowledge of the correct word).
-/// Greens at correct positions; yellows shown where they appeared.
-/// A yellow is suppressed only when greens fully account for all
-/// observed instances of that letter (observed_count == green_count).
-/// SPEC 1.2: yellows displaced by greens go to an extra cell if
-/// the letter has no yellow at any non-green position.
-pub fn compact_row(
-    guesses: &[Vec<(char, TileState)>],
-) -> (Vec<CompactCell>, Option<CompactCell>) {
-    let word_length = guesses[0].len();
-    assert!(guesses.iter().all(|r| r.len() == word_length), "all guesses must be the same length");
-    let mut green_at: Vec<Option<char>> = vec![None; word_length];
-    let mut yellow_at: Vec<Vec<char>> = (0..word_length).map(|_| Vec::new()).collect();
-    let mut observed_count_of: HashMap<char, usize> = HashMap::new();
-
-    for row in guesses.iter() {
-        let mut row_count_of: HashMap<char, usize> = HashMap::new();
-        for (i, &(c, state)) in row.iter().enumerate() {
-            match state {
-                TileState::Correct => {
-                    green_at[i] = Some(c);
-                    *row_count_of.entry(c).or_insert(0) += 1;
-                }
-                TileState::Present => {
-                    if !yellow_at[i].contains(&c) {
-                        yellow_at[i].push(c);
-                    }
-                    *row_count_of.entry(c).or_insert(0) += 1;
-                }
-                _ => {}
-            }
-        }
-        for (c, count) in row_count_of {
-            let entry = observed_count_of.entry(c).or_insert(0);
-            *entry = (*entry).max(count);
-        }
-    }
-
-    let green_count_of = |c: char| green_at.iter().filter(|g| **g == Some(c)).count();
-
-    // SPEC 1.2: save yellows displaced by greens.
-    let mut displaced: Vec<char> = Vec::new();
-    for i in 0..word_length {
-        if green_at[i].is_some() {
-            displaced.extend(yellow_at[i].drain(..));
-        }
-    }
-
-    // Suppress yellows only when greens fully account for observations.
-    for i in 0..word_length {
-        if green_at[i].is_some() {
-            continue;
-        }
-        yellow_at[i].retain(|&c| {
-            observed_count_of.get(&c).copied().unwrap_or(0) != green_count_of(c)
-        });
-    }
-
-    // SPEC 1.2: displaced yellows that aren't yellow elsewhere go to extra cell.
-    let mut extra: Vec<char> = Vec::new();
-    let mut extra_seen: Vec<char> = Vec::new();
-    for c in displaced {
-        if observed_count_of.get(&c).copied().unwrap_or(0) == green_count_of(c) {
-            continue;
-        }
-        let has_yellow_elsewhere = yellow_at.iter().any(|ys| ys.contains(&c));
-        if !has_yellow_elsewhere && !extra_seen.contains(&c) {
-            extra_seen.push(c);
-            extra.push(c);
-        }
-    }
-
-    // SPEC 1.3: determine which letters should be brown.
-    // Count total yellow occurrences per letter across compact row + extra.
-    let mut compact_yellow_count: HashMap<char, usize> = HashMap::new();
-    for pos_yellows in &yellow_at {
-        for &c in pos_yellows {
-            *compact_yellow_count.entry(c).or_insert(0) += 1;
-        }
-    }
-    for &c in &extra {
-        *compact_yellow_count.entry(c).or_insert(0) += 1;
-    }
-    // For each letter, find max yellow (Present) count in any single guess.
-    let mut max_guess_yellow: HashMap<char, usize> = HashMap::new();
-    for row in guesses {
-        let mut guess_count: HashMap<char, usize> = HashMap::new();
-        for &(c, state) in row {
-            if state == TileState::Present {
-                *guess_count.entry(c).or_insert(0) += 1;
-            }
-        }
-        for (c, count) in guess_count {
-            let entry = max_guess_yellow.entry(c).or_insert(0);
-            *entry = (*entry).max(count);
-        }
-    }
-    let is_brown = |c: char| -> bool {
-        compact_yellow_count.get(&c).copied().unwrap_or(0)
-            > max_guess_yellow.get(&c).copied().unwrap_or(0)
-    };
-
-    let row: Vec<CompactCell> = (0..word_length)
-        .map(|i| {
-            if let Some(c) = green_at[i] {
-                CompactCell::Green(c)
-            } else {
-                match yellow_at[i].len() {
-                    0 => CompactCell::Empty,
-                    1 => {
-                        let c = yellow_at[i][0];
-                        if is_brown(c) { CompactCell::BrownOne(c) } else { CompactCell::YellowOne(c) }
-                    }
-                    n => CompactCell::Yellows(
-                        yellow_at[i][..n].iter().map(|&c| (c, is_brown(c))).collect()
-                    ),
-                }
-            }
-        })
-        .collect();
-
-    let extra_cell = match extra.len() {
-        0 => None,
-        1 => {
-            let c = extra[0];
-            Some(if is_brown(c) { CompactCell::BrownOne(c) } else { CompactCell::YellowOne(c) })
-        }
-        _ => Some(CompactCell::Yellows(extra.iter().map(|&c| (c, is_brown(c))).collect())),
-    };
-
-    (row, extra_cell)
 }
 
 /// Per-word state: same structure as Sanuli for one word (guesses, known_states, known_counts).
@@ -271,40 +256,28 @@ impl Monuli {
     /// green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
     fn compact_row_sort_key(&self, word_index: usize) -> u64 {
         let (cells, extra) = self.compact_row(word_index);
-        let mut green_count: u64 = 0;
-        let mut green_pos_metric: u64 = 0;
-        let mut yellow_count: u64 = 0;
-        let mut brown_count: u64 = 0;
+        let mut green_count: usize = 0;
+        let mut green_pos_metric: usize = 0;
+        let mut yellow_count: usize = 0;
+        let mut brown_count: usize = 0;
         let n = cells.len();
         for (pos, cell) in cells.iter().enumerate() {
             match cell {
-                CompactCell::Green(_) => {
+                CompactTileState::Green(_) => {
                     green_count += 1;
                     green_pos_metric += 1 << (n - 1 - pos);
                 }
-                CompactCell::YellowOne(_) => yellow_count += 1,
-                CompactCell::BrownOne(_) => brown_count += 1,
-                CompactCell::Yellows(v) => {
-                    for &(_, is_brown) in v {
-                        if is_brown { brown_count += 1; } else { yellow_count += 1; }
-                    }
+                CompactTileState::Yellow(_) => yellow_count += 1,
+                CompactTileState::Brown(_) => brown_count += 1,
+                CompactTileState::Yellows(ys, bs) => {
+                    yellow_count += ys.len();
+                    brown_count += bs.len();
                 }
-                CompactCell::Empty => {}
+                CompactTileState::Empty => {}
             }
         }
-        if let Some(ref ex) = extra {
-            match ex {
-                CompactCell::YellowOne(_) => yellow_count += 1,
-                CompactCell::BrownOne(_) => brown_count += 1,
-                CompactCell::Yellows(v) => {
-                    for &(_, is_brown) in v {
-                        if is_brown { brown_count += 1; } else { yellow_count += 1; }
-                    }
-                }
-                _ => {}
-            }
-        }
-        green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
+        yellow_count += extra.len();
+        (green_count as u64) * 1_000_000 + (green_pos_metric as u64) * 1_000 + (yellow_count as u64) * 10 + (brown_count as u64)
     }
 
     /// Order for list view: unsolved first (optionally sorted by progress), then solved in solve order.
@@ -333,7 +306,7 @@ impl Monuli {
     }
 
     /// Compact row for one word (for monuli list view). SPEC 1.1 + 1.2.
-    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactCell>, Option<CompactCell>) {
+    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactTileState>, Vec<char>) {
         match self.words.get(word_index) {
             Some(w) => {
                 let up_to = w.solved_at.map(|s| s + 1).unwrap_or(self.current_guess);
@@ -345,11 +318,11 @@ impl Monuli {
                     .cloned()
                     .collect();
                 if submitted.is_empty() {
-                    return (vec![CompactCell::Empty; self.word_length], None);
+                    return (vec![CompactTileState::Empty; self.word_length], vec![]);
                 }
                 compact_row(&submitted)
             }
-            None => (vec![CompactCell::Empty; self.word_length], None),
+            None => (vec![CompactTileState::Empty; self.word_length], vec![]),
         }
     }
 
@@ -879,50 +852,6 @@ impl Game for Monuli {
 mod tests {
     use super::*;
 
-    fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactCell], expected_extra: Option<CompactCell>) {
-        let w: Vec<char> = word.chars().collect();
-        let max = guesses.len();
-        let mut states = vec![HashMap::new(); max];
-        let mut counts = vec![HashMap::new(); max];
-        let mut rows: Vec<Vec<(char, TileState)>> = guesses
-            .iter()
-            .map(|s| s.chars().map(|c| (c, TileState::Unknown)).collect())
-            .collect();
-        for (i, row) in rows.iter_mut().enumerate() {
-            game::update_known_information(&mut states, &mut counts, row, i, &w, max);
-        }
-        let (result, extra) = compact_row(&rows);
-        assert_eq!(result, expected, "word={word}, guesses={guesses:?}");
-        assert_eq!(extra, expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
-    }
-
-    fn g(c: char) -> CompactCell { CompactCell::Green(c) }
-    fn y(c: char) -> CompactCell { CompactCell::YellowOne(c) }
-    fn b(c: char) -> CompactCell { CompactCell::BrownOne(c) }
-    fn ys(cs: &[char]) -> CompactCell { CompactCell::Yellows(cs.iter().map(|&c| (c, false)).collect()) }
-    const E: CompactCell = CompactCell::Empty;
-
-    #[test]
-    fn compact_row_cases() {
-        // all green
-        test_compact_row("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')], None);
-        // SPEC 1.1.1: two yellows in same cell
-        test_compact_row("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, ys(&['L', 'H']), g('I')], None);
-        // one green, four yellow
-        test_compact_row("HANHI", &["HIHNA"], &[g('H'), y('I'), y('H'), y('N'), y('A')], None);
-        // duplicate yellow in same position deduped
-        test_compact_row("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')], None);
-        // yellow suppressed when letter already green
-        test_compact_row("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), E, E, g('A')], None);
-        // SPEC 1.3: I appears 2x as yellow but max 1 per guess → brown
-        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), b('I'), y('P'), E, b('I')], None);
-        // SPEC 1.2: displaced yellows go to extra cell
-        test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"],
-            &[g('M'), g('Ä'), E, E, E], Some(ys(&['Ä', 'R'])));
-        // SPEC 1.3.1: L appears 2x as yellow but max 1 per guess → brown
-        test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), b('L'), b('L'), g('I')], None);
-    }
-
     fn make_test_monuli(words: &[&str]) -> Monuli {
         let word_length = words[0].len();
         let all_words: HashSet<Vec<char>> = words.iter().map(|w| w.chars().collect()).collect();
@@ -990,5 +919,50 @@ mod tests {
                 let _ = m.keyboard_tilestate_for_word(wi, &c);
             }
         }
+    }
+
+    fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactTileState], expected_extra: &[char]) {
+        let w: Vec<char> = word.chars().collect();
+        let max = guesses.len();
+        let mut states = vec![HashMap::new(); max];
+        let mut counts = vec![HashMap::new(); max];
+        let mut rows: Vec<Vec<(char, TileState)>> = guesses
+            .iter()
+            .map(|s| s.chars().map(|c| (c, TileState::Unknown)).collect())
+            .collect();
+        for (i, row) in rows.iter_mut().enumerate() {
+            game::update_known_information(&mut states, &mut counts, row, i, &w, max);
+        }
+        let (result, extra) = compact_row(&rows);
+        assert_eq!(result, expected, "word={word}, guesses={guesses:?}");
+        assert_eq!(extra, expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
+    }
+
+    fn g(c: char) -> CompactTileState { CompactTileState::Green(c) }
+    fn y(c: char) -> CompactTileState { CompactTileState::Yellow(c) }
+    fn b(c: char) -> CompactTileState { CompactTileState::Brown(c) }
+    fn m(ys: &[char], bs: &[char]) -> CompactTileState { CompactTileState::Yellows(ys.iter().cloned().collect(), bs.iter().cloned().collect()) }
+    const E: CompactTileState = CompactTileState::Empty;
+
+    #[test]
+    fn compact_row_cases() {
+        // brown H suppressed (KAU**H**A) when green (**H**IENO) accounts for exact count of Hs (i.e. 1, known from absent H in HU**H**TA)
+        test_compact_row("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), b('U'), E, g('A')], &[]);
+        // there should be no displaced A when there's already two green A's
+        test_compact_row("SALPA", &["SUOMI", "HAHMO", "KOIPI", "OIKEA", "OHJAS"], &[g('S'), g('A'), E, g('P'), g('A')], &[]);
+        // SPEC 1.3.1: L appears 2x as yellow but max 1 per guess → brown
+        test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), y('L'), b('L'), g('I')], &[]);
+        // SPEC 1.3: I appears 2x as yellow but max 1 per guess → brown
+        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, b('I')], &[]);
+        // SPEC 1.2: displaced yellows go to extra cell
+        test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"], &[g('M'), g('Ä'), b('M'), E, E], &['Ä', 'R']);
+        // SPEC 1.1.1: two yellows in same cell
+        test_compact_row("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, m(&['L', 'H'], &[]), g('I')], &[]);
+        // one green, four yellow
+        test_compact_row("HANHI", &["HIHNA"], &[g('H'), y('I'), y('H'), y('N'), y('A')], &[]);
+        // duplicate yellow in same position deduped
+        test_compact_row("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')], &[]);
+        // all green
+        test_compact_row("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')], &[]);
     }
 }
