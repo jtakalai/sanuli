@@ -55,10 +55,6 @@ pub trait Game {
         vec![]
     }
 
-    /// When in Monuli and a word is selected for sanuli view. None = list view.
-    fn monuli_selected_word(&self) -> Option<usize> {
-        None
-    }
     /// Board for one word (Monuli sanuli view). None for other games or invalid index.
     fn board_for_word(&self, _word_index: usize) -> Option<Board> {
         None

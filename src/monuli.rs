@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::Msg;
 use crate::game::{self, KnownCounts, KnownStates, Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists, ControlKey,
-    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
+    CharacterCount, CharacterState, ControlKey, DEFAULT_ALLOW_PROFANITIES,
+    GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists,
 };
 
 #[cfg(web_sys_unstable_apis)]
@@ -20,13 +20,13 @@ use crate::manager::Theme;
 pub enum CompactTile {
     Empty,
     Correct(char),
-    Yellow(char),
-    /// SPEC 1.3: brown tile means that a letter would appear in more yellow tiles than is possible
-    Brown(char),
+    Present(char),
+    /// SPEC 1.3: maybe-present tile means that a letter would appear in more yellow tiles than is possible
+    MaybePresent(char),
     /// SPEC 1.4: absent tile means that no more of the letter can be in the word
     Absent(char),
-    /// many yellow or brown letters in this cell; bool = is_brown
-    Multi(HashSet<char>, HashSet<char>, HashSet<char>) // yellows, browns, absents
+    /// multiple non-green letters in this cell
+    Multi(HashSet<char>, HashSet<char>, HashSet<char>) // presents, maybe_presents, absents
 }
 
 /// SPEC 1.1: Compact one-row summary for a word
@@ -135,9 +135,9 @@ pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec
         } else if yellows_at[i].is_empty() && browns_at[i].is_empty() && absent_at[i].is_empty() {
             CompactTile::Empty
         } else if yellows_at[i].len() == 1 && browns_at[i].is_empty() && absent_at[i].is_empty() {
-            CompactTile::Yellow(*yellows_at[i].iter().next().unwrap())
+            CompactTile::Present(*yellows_at[i].iter().next().unwrap())
         } else if yellows_at[i].is_empty() && browns_at[i].len() == 1 && absent_at[i].is_empty() {
-            CompactTile::Brown(*browns_at[i].iter().next().unwrap())
+            CompactTile::MaybePresent(*browns_at[i].iter().next().unwrap())
         } else if yellows_at[i].is_empty() && browns_at[i].is_empty() && absent_at[i].len() == 1 {
             CompactTile::Absent(*absent_at[i].iter().next().unwrap())
         } else {
@@ -241,10 +241,6 @@ impl Monuli {
         self.selected_word_index = None;
     }
 
-    fn monuli_selected_word(&self) -> Option<usize> {
-        self.selected_word_index
-    }
-
     /// Sorting metric for a compact row: higher = better progress.
     /// green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
     fn compact_row_sort_key(&self, word_index: usize) -> u64 {
@@ -260,12 +256,12 @@ impl Monuli {
                     green_count += 1;
                     green_pos_metric += 1 << (n - 1 - pos);
                 }
-                CompactTile::Yellow(_) => { yellow_count += 1; }
-                CompactTile::Brown(_) => { brown_count += 1; }
+                CompactTile::Present(_) => { yellow_count += 1; }
+                CompactTile::MaybePresent(_) => { brown_count += 1; }
                 CompactTile::Absent(_) => {},
-                CompactTile::Multi(ys, bs, _as) => {
-                    yellow_count += ys.len();
-                    brown_count += bs.len();
+                CompactTile::Multi(ps, mps, _as) => {
+                    yellow_count += ps.len();
+                    brown_count += mps.len();
                 }
                 CompactTile::Empty => {}
             }
@@ -437,7 +433,7 @@ impl Monuli {
             current_guess: 0,
             streak: 0,
             message: String::new(),
-            allow_profanities: true,
+            allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             word_lists,
             selected_word_index: None,
             list_cursor: None,
@@ -1010,18 +1006,18 @@ mod tests {
     }
 
     fn g(c: char) -> CompactTile { CompactTile::Correct(c) }
-    fn y(c: char) -> CompactTile { CompactTile::Yellow(c) }
-    fn b(c: char) -> CompactTile { CompactTile::Brown(c) }
-    fn a(c: char) -> CompactTile { CompactTile::Absent(c) }
-    fn m(ys: &[char], bs: &[char], aas: &[char]) -> CompactTile {
-        CompactTile::Multi(ys.iter().cloned().collect(), bs.iter().cloned().collect(), aas.iter().cloned().collect())
+    fn y(c: char) -> CompactTile { CompactTile::Present(c) }
+    fn b(c: char) -> CompactTile { CompactTile::MaybePresent(c) }
+    fn h(c: char) -> CompactTile { CompactTile::Absent(c) }
+    fn m(ps: &[char], mps: &[char], aas: &[char]) -> CompactTile {
+        CompactTile::Multi(ps.iter().cloned().collect(), mps.iter().cloned().collect(), aas.iter().cloned().collect())
     }
     const E: CompactTile = CompactTile::Empty;
 
     #[test]
     fn compact_row_cases() {
         // SPEC 1.4.1: harmaa I
-        test_compact_row("PISIN", &["HIISI"], &[E, g('I'), y('I'), y('S'), a('I')], &[]);
+        test_compact_row("PISIN", &["HIISI"], &[E, g('I'), y('I'), y('S'), h('I')], &[]);
         // bug repro, fixed in 44be22139d5e6c4ff587cc2133293bacc97c0b65
         test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), y('L'), b('L'), g('I')], &[]);
         // brown H suppressed (KAU**H**A) when green (**H**IENO) accounts for exact count of Hs (i.e. 1, known from absent H in HU**H**TA)
@@ -1031,7 +1027,7 @@ mod tests {
         // SPEC 1.3.1: L appears 2x as yellow but max 1 per guess → brown
         test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), y('L'), b('L'), g('I')], &[]);
         // SPEC 1.3: I appears 2x as yellow but max 1 per guess → brown
-        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, a('I')], &[]);
+        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, h('I')], &[]);
         // SPEC 1.2: displaced yellows go to extra cell
         test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"], &[g('M'), g('Ä'), b('M'), E, E], &['Ä', 'R']);
         // SPEC 1.1.1: two yellows in same cell

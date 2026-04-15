@@ -18,9 +18,10 @@ use components::{
     header::Header,
     keyboard::{Keyboard, EnterButtonState},
     modal::{HelpModal, MenuModal},
+    monuli::MonuliView,
 };
 use manager::{ControlKey, GameMode, KeyState, Manager, Theme, WordList};
-use monuli::{CompactTile, Monuli};
+use monuli::Monuli;
 
 const ALLOWED_GUESS_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -81,13 +82,13 @@ impl Component for App {
         if let Some(g) = self.manager.game.as_mut() {
             if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
                 if let Some(target) = monuli.list_scroll_to.take() {
-                    scroll_monuli_word_list_to(target);
+                    monuli_scroll(".monuli-word-list", Some(target), None, true, 0.0);
                 } else if let Some(cursor) = monuli.list_ensure_visible.take() {
-                    ensure_cursor_visible_in_list(cursor);
+                    monuli_scroll(".monuli-word-list", Some(cursor), None, false, 2.0);
                 }
 
                 if monuli.selected_word_index.is_some() {
-                    ensure_sanuli_current_visible();
+                    monuli_scroll(".monuli-sanuli-view", None, Some(".monuli-sanuli-view .current"), false, 0.5);
                 }
             }
         }
@@ -275,9 +276,13 @@ impl Component for App {
 
             let boards = game.boards();
 
-            let monuli_word_solved = game.monuli_selected_word()
-                .map(|idx| game.monuli_word_is_solved(idx))
-                .unwrap_or(false);
+            let monuli_word_solved = if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
+                monuli.selected_word_index
+                    .map(|idx| monuli.monuli_word_is_solved(idx))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
             let enter_button_state = if monuli_word_solved {
                 EnterButtonState::Return
             } else if game.is_guessing() {
@@ -300,147 +305,13 @@ impl Component for App {
                         match (game.game_mode(), boards.len()) {
                             (GameMode::Monuli(_), _) => {
                                 if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
-                                    if let Some(word_idx) = monuli.selected_word_index {
-                                        // Sanuli view for a single word
-                                        if let Some(board) = game.board_for_word(word_idx) {
-                                            let onback = link.callback(move |e: MouseEvent| {
-                                                e.prevent_default();
-                                                Msg::SelectMonuliWord(None)
-                                            });
-                                            html! {
-                                                <>
-                                                    <div class="monuli-back-bar">
-                                                        <button class="monuli-back-button" onmousedown={onback}>
-                                                            {"← TAKAISIN"}
-                                                        </button>
-                                                    </div>
-                                                    <div class="board-container monuli-sanuli-view">
-                                                        <Board
-                                                            guesses={board.guesses}
-                                                            is_guessing={board.is_guessing}
-                                                            current_guess={board.current_guess}
-                                                            is_reset={false}
-                                                            is_hidden={false}
-                                                            previous_guesses={vec![]}
-                                                            max_guesses={game.max_guesses()}
-                                                            word_length={game.word_length()}
-                                                            board_class={"board-monuli".to_string()}
-                                                        />
-                                                    </div>
-                                                </>
-                                            }
-                                        } else {
-                                            html! {}
-                                        }
-                                    } else {
-                                        // List view: single column, scrollable
-                                        let word_length = game.word_length();
-                                        let word_order = monuli.word_order();
-                                        let current_letters: Vec<char> = last_guess.chars().collect();
-                                        let mut first_solved = word_order.len();
-                                        for (pos, &idx) in word_order.iter().enumerate() {
-                                            if monuli.word_is_solved(idx) {
-                                                first_solved = pos;
-                                                break;
-                                            }
-                                        }
-
-                                        let list_cursor = monuli.list_cursor;
-
-                                        html! {
-                                            <div class="monuli-list-view">
-                                                <div class={format!("row-{}", word_length)}>
-                                                    { (0..word_length).map(|i| {
-                                                        let c = current_letters.get(i).copied().unwrap_or(' ');
-                                                        html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
-                                                    }).collect::<Html>() }
-                                                </div>
-                                                <div class="monuli-word-list">
-                                                    { word_order.iter().enumerate().map(|(pos, &word_index)| {
-                                                        let (compact, extras) = monuli.compact_row(word_index);
-                                                        let is_first_solved = pos == first_solved && first_solved < word_order.len();
-                                                        let onselect = link.callback(move |e: MouseEvent| {
-                                                            e.prevent_default();
-                                                            Msg::SelectMonuliWord(Some(word_index))
-                                                        });
-                                                        let render_cell = |cell: &CompactTile| -> Html {
-                                                            match cell {
-                                                                CompactTile::Empty => html! {
-                                                                    <div class="compact-cell"></div>
-                                                                },
-                                                                CompactTile::Absent(c) => html! {
-                                                                    <div class="compact-cell absent">{ c }</div>
-                                                                },
-                                                                CompactTile::Correct(c) => html! {
-                                                                    <div class="compact-cell correct">{ c }</div>
-                                                                },
-                                                                CompactTile::Yellow(c) => html! {
-                                                                    <div class="compact-cell present">{ c }</div>
-                                                                },
-                                                                CompactTile::Brown(c) => html! {
-                                                                    <div class="compact-cell maybe-present">{ c }</div>
-                                                                },
-                                                                CompactTile::Multi(ys, bs, aas) => html! {
-                                                                    <div class="compact-cell compact-cell-multi">
-                                                                        {
-                                                                            ys.iter().map(|&c| html! {
-                                                                                <span class="present">{ c }</span>
-                                                                            }).chain(bs.iter().map(|&c| html! {
-                                                                                <span class="maybe-present">{ c }</span>
-                                                                            })).chain(aas.iter().map(|&c| html! {
-                                                                                <span class="absent">{ c }</span>
-                                                                            })).collect::<Html>()
-                                                                        }
-                                                                    </div>
-                                                                },
-                                                            }
-                                                        };
-                                                        let is_cursor = list_cursor == Some(pos);
-                                                        let row_class = if is_cursor {
-                                                            format!("row-{} monuli-compact-row monuli-row-selected", word_length)
-                                                        } else {
-                                                            format!("row-{} monuli-compact-row", word_length)
-                                                        };
-                                                        html! {
-                                                            <>
-                                                                { if is_first_solved {
-                                                                    html! { <div class="monuli-separator">{"Ratkaistut sanulit"}</div> }
-                                                                } else { html! {} } }
-                                                                <div class={row_class}
-                                                                     onmousedown={onselect}>
-                                                                    <div class="compact-cells-side"></div>
-                                                                    <div class="compact-cells-main">
-                                                                        { compact.iter().map(&render_cell).collect::<Html>() }
-                                                                    </div>
-                                                                    <div class="compact-cells-side">
-                                                                        { if extras.is_empty() {
-                                                                            html! {}
-                                                                        } else if extras.len() == 1 {
-                                                                            let c = extras[0];
-                                                                            html! {
-                                                                                <div class="compact-cell present">{ c }</div>
-                                                                            }
-                                                                        } else {
-                                                                            html! {
-                                                                                <div class="compact-cell compact-cell-multi">
-                                                                                    { extras.iter().map(|&c| html! {
-                                                                                        <span class="present">{ c }</span>
-                                                                                    }).collect::<Html>()
-                                                                                    }
-                                                                                </div>
-                                                                            }
-                                                                        } }
-                                                                    </div>
-                                                                    { if is_cursor {
-                                                                        html! { <div class="monuli-row-arrow">{"→"}</div> }
-                                                                    } else { html! {} } }
-                                                                </div>
-                                                            </>
-                                                        }
-                                                    }).collect::<Html>() }
-                                                </div>
-                                            </div>
-                                        }
+                                    html! {
+                                        <MonuliView
+                                            game={monuli.clone()}
+                                            last_guess={last_guess.clone()}
+                                            callback={link.callback(move |msg| msg)}
+                                            max_guesses={game.max_guesses()}
+                                        />
                                     }
                                 } else {
                                     html! { <div class="board-container"><p class="monuli-placeholder">{"Monuli"}</p></div> }
@@ -552,102 +423,42 @@ impl Component for App {
     }
 }
 
-/// Scroll `.monuli-word-list` so that the row at `target_pos` is centered.
-fn scroll_monuli_word_list_to(target_pos: usize) {
-    let window = match window() {
-        Some(w) => w,
-        None => return,
+/// Scrolling helper for Monuli mode: often things take more space than what fits on screen
+/// This scrolls the monuli view to target index e.g. when using keyboard to navigate, or when returning to list view
+fn monuli_scroll(container_selector: &str, target_index: Option<usize>, target_selector: Option<&str>, center: bool, margin_rows: f64) {
+    let window = match window() { Some(w) => w, None => return };
+    let document = match window.document() { Some(d) => d, None => return };
+    let container = match document.query_selector(container_selector).ok().flatten() {
+        Some(el) => el.dyn_into::<web_sys::HtmlElement>().unwrap(),
+        None => return
     };
-    let document = match window.document() {
-        Some(d) => d,
-        None => return,
+
+    let target_el = if let Some(idx) = target_index {
+        container.children().item(idx as u32).and_then(|el| el.dyn_into::<web_sys::HtmlElement>().ok())
+    } else if let Some(sel) = target_selector {
+        document.query_selector(sel).ok().flatten().and_then(|el| el.dyn_into::<web_sys::HtmlElement>().ok())
+    } else {
+        None
     };
-    if let Some(list_el) = document.query_selector(".monuli-word-list").ok().flatten() {
-        let children = list_el.children();
-        if let Some(target_el) = children.item(target_pos as u32) {
-            let container_height = list_el.client_height() as f64;
-            let el = target_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-            let row_top = el.offset_top() as f64 - list_el.dyn_ref::<web_sys::HtmlElement>().unwrap().offset_top() as f64;
-            let row_height = el.offset_height() as f64;
+
+    if let Some(el) = target_el {
+        let el_html = el.dyn_ref::<web_sys::HtmlElement>().unwrap();
+        let container_html = container.dyn_ref::<web_sys::HtmlElement>().unwrap();
+        let row_top = el_html.offset_top() as f64 - container_html.offset_top() as f64;
+        let row_height = el_html.offset_height() as f64;
+        let container_height = container_html.client_height() as f64;
+        let scroll_top = container_html.scroll_top() as f64;
+
+        if center {
             let scroll_to = (row_top - container_height / 2.0 + row_height / 2.0).max(0.0);
-            list_el.set_scroll_top(scroll_to as i32);
-        }
-    }
-}
-
-/// Ensure `.monuli-word-list` scroll keeps cursor visible with margins:
-/// scroll down if cursor goes past the 8th visible row, up if above the 3rd.
-fn ensure_cursor_visible_in_list(cursor_pos: usize) {
-    let window = match window() {
-        Some(w) => w,
-        None => return,
-    };
-    let document = match window.document() {
-        Some(d) => d,
-        None => return,
-    };
-    if let Some(list_el) = document.query_selector(".monuli-word-list").ok().flatten() {
-        let children = list_el.children();
-        if let Some(target_el) = children.item(cursor_pos as u32) {
-            let list_html = list_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-            let el = target_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-            let row_top = el.offset_top() as f64 - list_html.offset_top() as f64;
-            let row_height = el.offset_height() as f64;
-            let scroll_top = list_el.scroll_top() as f64;
-            let container_height = list_el.client_height() as f64;
-
+            container.set_scroll_top(scroll_to as i32);
+        } else {
             let row_bottom = row_top + row_height;
-            let visible_top = scroll_top;
-            let visible_bottom = scroll_top + container_height;
-
-            let margin_top_rows = 2.0 * row_height;
-            let margin_bottom_rows = 2.0 * row_height;
-
-            if row_top < visible_top + margin_top_rows {
-                let new_scroll = (row_top - margin_top_rows).max(0.0);
-                list_el.set_scroll_top(new_scroll as i32);
-            } else if row_bottom > visible_bottom - margin_bottom_rows {
-                let new_scroll = row_bottom + margin_bottom_rows - container_height;
-                list_el.set_scroll_top(new_scroll as i32);
-            }
-        }
-    }
-}
-
-/// Ensure the currently active row in Monuli single-word view is visible.
-fn ensure_sanuli_current_visible() {
-    let window = match window() {
-        Some(w) => w,
-        None => return,
-    };
-    let document = match window.document() {
-        Some(d) => d,
-        None => return,
-    };
-    if let Some(container_el) = document.query_selector(".monuli-sanuli-view").ok().flatten() {
-        if let Some(current_tile) = document.query_selector(".monuli-sanuli-view .current").ok().flatten() {
-            if let Some(row_el) = current_tile.parent_element() {
-                let container = container_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-                let row = row_el.dyn_ref::<web_sys::HtmlElement>().unwrap();
-
-                let row_top = row.offset_top() as f64 - container.offset_top() as f64;
-                let row_height = row.offset_height() as f64;
-                let scroll_top = container.scroll_top() as f64;
-                let container_height = container.client_height() as f64;
-
-                let row_bottom = row_top + row_height;
-                let visible_top = scroll_top;
-                let visible_bottom = scroll_top + container_height;
-
-                let margin = row_height * 0.5;
-
-                if row_top < visible_top + margin {
-                    let new_scroll = (row_top - margin).max(0.0);
-                    container.set_scroll_top(new_scroll as i32);
-                } else if row_bottom > visible_bottom - margin {
-                    let new_scroll = row_bottom + margin - container_height;
-                    container.set_scroll_top(new_scroll as i32);
-                }
+            let margin = margin_rows * row_height;
+            if row_top < scroll_top + margin {
+                container.set_scroll_top((row_top - margin).max(0.0) as i32);
+            } else if row_bottom > scroll_top + container_height - margin {
+                container.set_scroll_top((row_bottom + margin - container_height) as i32);
             }
         }
     }

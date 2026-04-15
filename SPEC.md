@@ -146,4 +146,4 @@ Esimerkki 1.4.1: sana on PISIN
 
 Poistetaan overview cursor, joka aiheutti kamalasti noisea main.rs:ään. Monuli-projektin tavoite on koskea Sanuli-koodiin mahdollisimman vähän. Poistetaan oikeastaan saman tien koko overview, ja työstetään sitä myöhemmin erillisessä branchissa, ehkä.
 
-Uudellenkäytetään CharacterStatea jne. sekä samoja termejä: green -> correct, yellow -> present, brown -> absent
+Uudellenkäytetään TileStatea jne. sekä samoja termejä: green -> correct, yellow -> present, brown -> maybe-present
