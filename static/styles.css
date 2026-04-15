@@ -756,18 +756,34 @@ header {
 }
 
 .monuli-separator {
-    height: 4px;
-    background: var(--absent);
     width: 100%;
     max-width: 230px;
-    margin: 2px 0;
+    margin: 8px 0 4px;
+    font-size: 0.7rem;
+    color: var(--absent);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-top: 1px solid var(--absent);
+    padding-top: 4px;
 }
 
 .monuli-compact-row {
     display: flex;
-    gap: 5px;
     cursor: pointer;
     padding: 0;
+    align-items: center;
+}
+
+.compact-cells-main {
+    display: flex;
+    gap: 5px;
+    flex-shrink: 0;
+}
+
+.compact-cells-extra {
+    margin-left: 10px;
+    flex-shrink: 0;
 }
 
 .monuli-compact-row:hover {
@@ -803,6 +819,11 @@ header {
     border: none;
 }
 
+.compact-cell-brown {
+    background-color: #92700c;
+    border: none;
+}
+
 .compact-cell-yellows {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -815,8 +836,7 @@ header {
 }
 
 .compact-cell-extra-gap {
-    width: 21px;
-    flex-shrink: 0;
+    display: none;
 }
 
 .compact-cell-yellows .compact-cell-yellow {
@@ -879,6 +899,10 @@ header {
 
 .overview-cell-yellow {
     background-color: var(--present);
+}
+
+.overview-cell-brown {
+    background-color: #92700c;
 }
 
 .monuli-overview-btn {

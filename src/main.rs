@@ -298,6 +298,7 @@ impl Component for App {
                                                 CompactCell::Empty => ("overview-cell overview-cell-empty", None),
                                                 CompactCell::Green(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
                                                 CompactCell::YellowOne(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
+                                                CompactCell::BrownOne(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
                                                 CompactCell::Yellows(_) => ("overview-cell overview-cell-yellow", None),
                                             };
                                             if let Some(ch) = letter {
@@ -389,9 +390,15 @@ impl Component for App {
                                                                 CompactCell::YellowOne(c) => html! {
                                                                     <div class="compact-cell compact-cell-yellow">{ c }</div>
                                                                 },
+                                                                CompactCell::BrownOne(c) => html! {
+                                                                    <div class="compact-cell compact-cell-brown">{ c }</div>
+                                                                },
                                                                 CompactCell::Yellows(chars) => html! {
                                                                     <div class="compact-cell compact-cell-yellows">
-                                                                        { chars.iter().map(|c| html! { <span class="compact-cell-yellow">{ c }</span> }).collect::<Html>() }
+                                                                        { chars.iter().map(|&(c, brown)| {
+                                                                            let cls = if brown { "compact-cell-brown" } else { "compact-cell-yellow" };
+                                                                            html! { <span class={cls}>{ c }</span> }
+                                                                        }).collect::<Html>() }
                                                                     </div>
                                                                 },
                                                             }
@@ -399,17 +406,18 @@ impl Component for App {
                                                         html! {
                                                             <>
                                                                 { if is_first_solved {
-                                                                    html! { <div class="monuli-separator"></div> }
+                                                                    html! { <div class="monuli-separator">{"Ratkaistut sanulit"}</div> }
                                                                 } else { html! {} } }
                                                                 <div class={format!("row-{} monuli-compact-row", word_length)}
                                                                      onmousedown={onselect}>
-                                                                    { compact.iter().map(&render_cell).collect::<Html>() }
+                                                                    <div class="compact-cells-main">
+                                                                        { compact.iter().map(&render_cell).collect::<Html>() }
+                                                                    </div>
                                                                     { if let Some(ref ex) = extra {
                                                                         html! {
-                                                                            <>
-                                                                                <div class="compact-cell-extra-gap"></div>
+                                                                            <div class="compact-cells-extra">
                                                                                 { render_cell(ex) }
-                                                                            </>
+                                                                            </div>
                                                                         }
                                                                     } else { html! {} } }
                                                                 </div>

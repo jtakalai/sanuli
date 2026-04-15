@@ -40,14 +40,16 @@ fn get_random_word_excluding(
     Some((*chosen).clone())
 }
 
-/// One cell in a compact row (SPEC 1.1). Per position: either green, or one or more yellows, or empty.
+/// One cell in a compact row (SPEC 1.1). Per position: either green, or one or more yellows/browns, or empty.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CompactCell {
     Empty,
     Green(char),
     YellowOne(char),
-    /// 2–4 yellow letters in this cell (from different guesses); UI renders as 2×2 grid.
-    Yellows(Vec<char>),
+    /// SPEC 1.3: letter appears more times as yellow than any single guess supports.
+    BrownOne(char),
+    /// 2–4 yellow/brown letters in this cell; bool = is_brown (SPEC 1.3).
+    Yellows(Vec<(char, bool)>),
 }
 
 /// Compact one-row summary for a word (SPEC 1.1 + 1.2).
@@ -123,6 +125,36 @@ pub fn compact_row(
         }
     }
 
+    // SPEC 1.3: determine which letters should be brown.
+    // Count total yellow occurrences per letter across compact row + extra.
+    let mut compact_yellow_count: HashMap<char, usize> = HashMap::new();
+    for pos_yellows in &yellow_at {
+        for &c in pos_yellows {
+            *compact_yellow_count.entry(c).or_insert(0) += 1;
+        }
+    }
+    for &c in &extra {
+        *compact_yellow_count.entry(c).or_insert(0) += 1;
+    }
+    // For each letter, find max yellow (Present) count in any single guess.
+    let mut max_guess_yellow: HashMap<char, usize> = HashMap::new();
+    for row in guesses {
+        let mut guess_count: HashMap<char, usize> = HashMap::new();
+        for &(c, state) in row {
+            if state == TileState::Present {
+                *guess_count.entry(c).or_insert(0) += 1;
+            }
+        }
+        for (c, count) in guess_count {
+            let entry = max_guess_yellow.entry(c).or_insert(0);
+            *entry = (*entry).max(count);
+        }
+    }
+    let is_brown = |c: char| -> bool {
+        compact_yellow_count.get(&c).copied().unwrap_or(0)
+            > max_guess_yellow.get(&c).copied().unwrap_or(0)
+    };
+
     let row: Vec<CompactCell> = (0..word_length)
         .map(|i| {
             if let Some(c) = green_at[i] {
@@ -130,8 +162,13 @@ pub fn compact_row(
             } else {
                 match yellow_at[i].len() {
                     0 => CompactCell::Empty,
-                    1 => CompactCell::YellowOne(yellow_at[i][0]),
-                    n => CompactCell::Yellows(yellow_at[i][..n].to_vec()),
+                    1 => {
+                        let c = yellow_at[i][0];
+                        if is_brown(c) { CompactCell::BrownOne(c) } else { CompactCell::YellowOne(c) }
+                    }
+                    n => CompactCell::Yellows(
+                        yellow_at[i][..n].iter().map(|&c| (c, is_brown(c))).collect()
+                    ),
                 }
             }
         })
@@ -139,8 +176,11 @@ pub fn compact_row(
 
     let extra_cell = match extra.len() {
         0 => None,
-        1 => Some(CompactCell::YellowOne(extra[0])),
-        _ => Some(CompactCell::Yellows(extra)),
+        1 => {
+            let c = extra[0];
+            Some(if is_brown(c) { CompactCell::BrownOne(c) } else { CompactCell::YellowOne(c) })
+        }
+        _ => Some(CompactCell::Yellows(extra.iter().map(|&c| (c, is_brown(c))).collect())),
     };
 
     (row, extra_cell)
@@ -153,18 +193,14 @@ pub struct MonuliWordState {
     pub guesses: Vec<Vec<(char, TileState)>>,
     pub known_states: Vec<KnownStates>,
     pub known_counts: Vec<KnownCounts>,
+    /// Guess index at which this word was solved (None if unsolved).
+    #[serde(default)]
+    pub solved_at: Option<usize>,
 }
 
 impl MonuliWordState {
     fn is_solved(&self) -> bool {
-        self.known_states
-            .last()
-            .map(|s| {
-                (0..self.word.len()).all(|i| {
-                    s.get(&(self.word[i], i)) == Some(&CharacterState::Correct)
-                })
-            })
-            .unwrap_or(false)
+        self.solved_at.is_some()
     }
 }
 
@@ -224,14 +260,14 @@ impl Monuli {
             .filter(|(_, w)| !w.is_solved())
             .map(|(i, _)| i)
             .collect();
-        let mut solved: Vec<usize> = self
+        let mut solved: Vec<(usize, usize)> = self
             .words
             .iter()
             .enumerate()
-            .filter(|(_, w)| w.is_solved())
-            .map(|(i, _)| i)
+            .filter_map(|(i, w)| w.solved_at.map(|s| (i, s)))
             .collect();
-        unsolved.append(&mut solved);
+        solved.sort_by_key(|&(_, s)| s);
+        unsolved.extend(solved.into_iter().map(|(i, _)| i));
         unsolved
     }
 
@@ -239,10 +275,11 @@ impl Monuli {
     pub fn compact_row(&self, word_index: usize) -> (Vec<CompactCell>, Option<CompactCell>) {
         match self.words.get(word_index) {
             Some(w) => {
+                let up_to = w.solved_at.map(|s| s + 1).unwrap_or(self.current_guess);
                 let submitted: Vec<_> = w
                     .guesses
                     .iter()
-                    .take(self.current_guess)
+                    .take(up_to)
                     .filter(|row| row.len() == self.word_length)
                     .cloned()
                     .collect();
@@ -335,6 +372,7 @@ impl Monuli {
                 guesses,
                 known_states,
                 known_counts,
+                solved_at: None,
             });
         }
         Self {
@@ -381,6 +419,7 @@ impl Monuli {
                     guesses,
                     known_states,
                     known_counts,
+                    solved_at: None,
                 }
             })
             .collect();
@@ -574,11 +613,20 @@ impl Game for Monuli {
     }
     fn board_for_word(&self, word_index: usize) -> Option<Board> {
         let w = self.words.get(word_index)?;
-        Some(Board {
-            guesses: w.guesses.clone(),
-            current_guess: self.current_guess,
-            is_guessing: self.is_guessing(),
-        })
+        if let Some(solved_at) = w.solved_at {
+            let guesses = w.guesses[..=solved_at].to_vec();
+            Some(Board {
+                guesses,
+                current_guess: solved_at + 1,
+                is_guessing: false,
+            })
+        } else {
+            Some(Board {
+                guesses: w.guesses.clone(),
+                current_guess: self.current_guess,
+                is_guessing: self.is_guessing(),
+            })
+        }
     }
     fn keyboard_tilestate_for_word(&self, word_index: usize, key: &char) -> KeyState {
         match self.words.get(word_index) {
@@ -605,10 +653,13 @@ impl Game for Monuli {
         let max_guesses = self.max_guesses();
         let guess_letters: Vec<char> = self.current_guess_letters();
 
-        // When in sanuli view, only the selected word has the current row; copy it to all words for evaluation.
+        // When in sanuli view, only the selected word has the current row; copy it to all unsolved words for evaluation.
         if let Some(src) = self.selected_word_index.filter(|&i| i < self.words.len()) {
             let row = self.words[src].guesses[self.current_guess].clone();
             for w in self.words.iter_mut() {
+                if w.is_solved() {
+                    continue;
+                }
                 if w.guesses[self.current_guess].len() != self.word_length {
                     w.guesses[self.current_guess] = row.clone();
                 }
@@ -621,7 +672,7 @@ impl Game for Monuli {
                 .words
                 .iter()
                 .enumerate()
-                .filter(|(_, w)| w.word == guess_letters)
+                .filter(|(_, w)| !w.is_solved() && w.word == guess_letters)
                 .map(|(i, _)| i)
                 .collect();
             for i in to_replace {
@@ -629,16 +680,27 @@ impl Game for Monuli {
             }
         }
 
+        let guess_idx = self.current_guess;
         for w in self.words.iter_mut() {
-            if w.guesses[self.current_guess].len() == self.word_length {
+            if w.is_solved() {
+                continue;
+            }
+            if w.guesses[guess_idx].len() == self.word_length {
                 game::update_known_information(
                     &mut w.known_states,
                     &mut w.known_counts,
-                    &mut w.guesses[self.current_guess],
-                    self.current_guess,
+                    &mut w.guesses[guess_idx],
+                    guess_idx,
                     &w.word,
                     max_guesses,
                 );
+                let all_correct = (0..w.word.len()).all(|i| {
+                    w.known_states[guess_idx].get(&(w.word[i], i))
+                        == Some(&CharacterState::Correct)
+                });
+                if all_correct {
+                    w.solved_at = Some(guess_idx);
+                }
             }
         }
 
@@ -665,6 +727,9 @@ impl Game for Monuli {
         };
         for i in words_to_update {
             let w = &mut self.words[i];
+            if w.is_solved() {
+                continue;
+            }
             if w.guesses[idx].len() < self.word_length {
                 let tile_state = game::hint_tile_state(
                     character,
@@ -688,6 +753,9 @@ impl Game for Monuli {
             _ => (0..self.words.len()).collect(),
         };
         for i in words_to_update {
+            if self.words[i].is_solved() {
+                continue;
+            }
             if !self.words[i].guesses[idx].is_empty() {
                 self.words[i].guesses[idx].pop();
             }
@@ -774,7 +842,8 @@ mod tests {
 
     fn g(c: char) -> CompactCell { CompactCell::Green(c) }
     fn y(c: char) -> CompactCell { CompactCell::YellowOne(c) }
-    fn ys(cs: &[char]) -> CompactCell { CompactCell::Yellows(cs.to_vec()) }
+    fn b(c: char) -> CompactCell { CompactCell::BrownOne(c) }
+    fn ys(cs: &[char]) -> CompactCell { CompactCell::Yellows(cs.iter().map(|&c| (c, false)).collect()) }
     const E: CompactCell = CompactCell::Empty;
 
     #[test]
@@ -789,10 +858,12 @@ mod tests {
         test_compact_row("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')], None);
         // yellow suppressed when letter already green
         test_compact_row("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), E, E, g('A')], None);
-        // yellows shown at guess positions; no budget — both I's stay
-        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, y('I')], None);
+        // SPEC 1.3: I appears 2x as yellow but max 1 per guess → brown
+        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), b('I'), y('P'), E, b('I')], None);
         // SPEC 1.2: displaced yellows go to extra cell
         test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"],
             &[g('M'), g('Ä'), E, E, E], Some(ys(&['Ä', 'R'])));
+        // SPEC 1.3.1: L appears 2x as yellow but max 1 per guess → brown
+        test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), b('L'), b('L'), g('I')], None);
     }
 }

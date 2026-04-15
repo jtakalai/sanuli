@@ -75,10 +75,8 @@ Paluunappi monulinäkymään
 
 # tarkennus 1.1: monta keltaista samassa ruudussa
 
-Monulinäkymässä pitäisi näkyä, missä kohdissa vääriin kohtiin arvatut kirjaimet ovat. Samaan kohtaan voi tulla useita vääriä arvauksia:
-- esimerkki 1.1.1: oikea sana LAHTI
-    - arvaus 1: KAALI (L väärässä paikassa 4)
-    - arvaus 2: TARHA (H väärässä paikassa 4)
+Monulinäkymässä pitäisi näkyä, missä kohdissa vääriin kohtiin arvatut kirjaimet ovat. Samaan kohtaan voi tulla useita vääriä arvauksia.
+
 Silloin pitäisi samassa ruudussa olla useampi keltainen kirjain, kuitenkin niitä voi olla maksimissaan neljä viiden kirjaimen sanassa (viimeistään viides olisi oikein). Siispä jos samassa kohdassa on useampi keltainen kirjain, ne pitää merkitä pienemmällä. Yksi mahdollisuus olisi tehdä niistä neljänneksen kokoisia (puolikas korkeus ja leveys).
 
 Kukin monulinäkymän arvausrivi on siis viisi (tai kuusi) kappaletta jotain seuraavista:
@@ -89,17 +87,31 @@ Kukin monulinäkymän arvausrivi on siis viisi (tai kuusi) kappaletta jotain seu
     - keltataustainen kirjain
     - tyhjä ruutu
 
-esimerkin 1.1.1 kahden arvauksen jälkeen väritys olisi:
-- keltataustainen T
-- vihreätaustainen A
-- tyhjä ruutu
-- 2x2 ruudukko, jossa:
-    - keltataustainen L
-    - keltataustainen H
-- vihreätaustainen I
+**Esimerkki 1.1.1**: oikea sana LAHTI
+    - arvaus 1: KAALI (L väärässä paikassa 4)
+    - arvaus 2: TARHA (H väärässä paikassa 4)
+	- haluttu väritys olisi:
+		- keltataustainen T
+		- vihreätaustainen A
+		- tyhjä ruutu
+		- 2x2 ruudukko, jossa:
+			- keltataustainen L
+			- keltataustainen H
+		- vihreätaustainen I
 
 # tarkennus 1.2: keltainen, joka on jäänyt vihreän alle
 
 Joskus keltainen väärä arvaus jää myöhemmän vihreän arvauksen alle (tai ehkä aiemmankin). Jos sama kirjain on päätynyt keltaiseksi myös muualle, se näytetään mieluummin siellä. Jos taas kirjaimelle ei ole keltaista arvausta ruudussa, jossa ei ole vihreää, se pitää näyttää jotenkin muuten.
 
 Jotta vältetään se, että keltainen olisi hämäävästi väärässä ruudussa, tarvitaan ylimääräinen ruutu keltaisille, jotka ovat jääneet ilman ruutua. Lisäruutu sijoitetaan sanan perään, väliin puolikkaan ruudun levyinen erotin. Jos useampi keltainen on jäänyt ilman ruutua, lisäruutu jaetaan samalla tavalla kuin kohdan 1.1 esimerkissä.
+
+# 1.3: ruskeat kirjaimet
+
+Monulinäkymässä on hämäävää, jos keltaisella näkyy monta kertaa sama kirjain, vaikka sitä ei sanassa ole kuin kerran. Jos siis arvausrivillä on sama kirjain monta kertaa keltaisella, mutta yhdessäkään arvauksessa ei ole havaittu kirjainta niin montaa kertaa nimenomaan keltaisena, niin silloin kirjaimen tulee olla ruskea. Toisin sanoen monulinäkymässä useammin ei-vihreänä esiintyvä kirjain on ruskea, ellei ole ainakin yhtä arvausta, missä kirjain olisi ollut keltaisena yhtä monta kertaa.
+
+**Esimerkki 1.3.1**: oikea sana LAHTI
+- arvaus 1: KAALI (L väärässä paikassa 4)
+- arvaus 2: PALVI (L väärässä paikassa 3)
+- ennen 1.3-korjausta tiivistelmärivi olisi: tyhjä, vihreä A, keltainen L, keltainen L, vihreä I
+- korjauksen jälkeen pitäisi tiivistelmärivin olla: tyhjä, vihreä A, ruskea L, ruskea L, vihreä I
+- syy: L on kahdesti ei-vihreänä tiivistelmärivissä, mutta on vain arvauksia, missä on 1 keltainen L (vähemmän kuin 2)
