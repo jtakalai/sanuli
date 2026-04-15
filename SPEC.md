@@ -142,6 +142,12 @@ Esimerkki 1.4.1: sana on PISIN
 - arvaus: HIISI
 - tulos monulirivissä olisi tällöin suunnilleen sama kuin sanulirivissä: tyhjä, vihreä I, keltainen I, keltainen S, harmaa I
 
+# 1.5: monulin pisteytys: ei putki vaan vähimmät yritykset
+
+Aiempi idea oli, että jokainen monulin sana pitäisi käydä erikseen ratkaisemassa. Kielimalli koodasi kuitenkin homma niin, että kokonaan vihreä sana oli ratkaistu (is_solved), vaikkei oikeaa sanaa olisi missään vaiheessa arvattu. Tämä tekee mahdolliseksi (jopa helpoksi) esim. Monuli(100):n ratkaisemisen 27 arvauksella. Tämä "bugi" johtaa oikeastaan paljon mielenkiintoisempaan ja taktisempaan monuliin!
+
+Koska monulin ratkoja voi pyrkiä minimaaliseen määrään arvauksia avatakseen kaikki sanat, olisi ehkä järkevämpää seurata parasta tulosta (vähiten yrityksiä) putken sijaan. Monulista voisi toisin sanoen poistaa kaikki max_guesses ja streak -logiikat, mutta voi niiden toisaalta antaa olla niin kauan kuin ne ovat Game-traitissa.
+
 # 2.0: cleanup sanuli-PR:ää varten
 
 Poistetaan overview cursor, joka aiheutti kamalasti noisea main.rs:ään. Monuli-projektin tavoite on koskea Sanuli-koodiin mahdollisimman vähän. Poistetaan oikeastaan saman tien koko overview, ja työstetään sitä myöhemmin erillisessä branchissa, ehkä.
