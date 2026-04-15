@@ -50,53 +50,80 @@ pub enum CompactCell {
     Yellows(Vec<char>),
 }
 
-/// Compact one-row summary for a word (SPEC 1.1). Greens at correct positions; yellows
-/// per position (which wrong-position letter landed in which cell). Same cell can have
-/// multiple yellows from different guesses. Yellows for a letter are suppressed when
-/// greens already account for all occurrences of that letter in the word.
+/// Compact one-row summary for a word (SPEC 1.1 + 1.2).
+/// Built from guesses only (no knowledge of the correct word).
+/// Greens at correct positions; yellows shown where they appeared.
+/// A yellow is suppressed only when greens fully account for all
+/// observed instances of that letter (observed_count == green_count).
+/// SPEC 1.2: yellows displaced by greens go to an extra cell if
+/// the letter has no yellow at any non-green position.
 pub fn compact_row(
-    word: &[char],
     guesses: &[Vec<(char, TileState)>],
-) -> Vec<CompactCell> {
-    let word_length = word.len();
+) -> (Vec<CompactCell>, Option<CompactCell>) {
+    let word_length = guesses[0].len();
+    assert!(guesses.iter().all(|r| r.len() == word_length), "all guesses must be the same length");
     let mut green_at: Vec<Option<char>> = vec![None; word_length];
     let mut yellow_at: Vec<Vec<char>> = (0..word_length).map(|_| Vec::new()).collect();
+    let mut observed_count_of: HashMap<char, usize> = HashMap::new();
+
     for row in guesses.iter() {
-        if row.len() != word_length {
-            continue;
-        }
+        let mut row_count_of: HashMap<char, usize> = HashMap::new();
         for (i, &(c, state)) in row.iter().enumerate() {
             match state {
-                TileState::Correct => green_at[i] = Some(c),
+                TileState::Correct => {
+                    green_at[i] = Some(c);
+                    *row_count_of.entry(c).or_insert(0) += 1;
+                }
                 TileState::Present => {
                     if !yellow_at[i].contains(&c) {
                         yellow_at[i].push(c);
                     }
+                    *row_count_of.entry(c).or_insert(0) += 1;
                 }
                 _ => {}
             }
         }
+        for (c, count) in row_count_of {
+            let entry = observed_count_of.entry(c).or_insert(0);
+            *entry = (*entry).max(count);
+        }
     }
 
-    // Suppress yellows for letters already fully accounted for by greens.
-    // Track how many yellows we've kept per letter so far (left-to-right).
-    let mut yellow_used: HashMap<char, usize> = HashMap::new();
+    let green_count_of = |c: char| green_at.iter().filter(|g| **g == Some(c)).count();
+
+    // SPEC 1.2: save yellows displaced by greens.
+    let mut displaced: Vec<char> = Vec::new();
     for i in 0..word_length {
-        let green_count = |c: char| green_at.iter().filter(|g| **g == Some(c)).count();
-        let word_count = |c: char| word.iter().filter(|&&ch| ch == c).count();
+        if green_at[i].is_some() {
+            displaced.extend(yellow_at[i].drain(..));
+        }
+    }
+
+    // Suppress yellows only when greens fully account for observations.
+    for i in 0..word_length {
+        if green_at[i].is_some() {
+            continue;
+        }
         yellow_at[i].retain(|&c| {
-            let budget = word_count(c).saturating_sub(green_count(c));
-            let used = yellow_used.get(&c).copied().unwrap_or(0);
-            if used < budget {
-                *yellow_used.entry(c).or_insert(0) += 1;
-                true
-            } else {
-                false
-            }
+            observed_count_of.get(&c).copied().unwrap_or(0) != green_count_of(c)
         });
     }
 
-    (0..word_length)
+    // SPEC 1.2: displaced yellows that aren't yellow elsewhere go to extra cell.
+    let mut extra: Vec<char> = Vec::new();
+    let mut extra_seen: Vec<char> = Vec::new();
+    for c in displaced {
+        if observed_count_of.get(&c).copied().unwrap_or(0) == green_count_of(c) {
+            continue;
+        }
+        let has_yellow_elsewhere = yellow_at.iter().any(|ys| ys.contains(&c));
+        if !has_yellow_elsewhere && !extra_seen.contains(&c) {
+            extra_seen.push(c);
+            extra.push(c);
+        }
+    }
+
+    let row: Vec<CompactCell> = (0..word_length)
         .map(|i| {
             if let Some(c) = green_at[i] {
                 CompactCell::Green(c)
@@ -108,7 +135,15 @@ pub fn compact_row(
                 }
             }
         })
-        .collect()
+        .collect();
+
+    let extra_cell = match extra.len() {
+        0 => None,
+        1 => Some(CompactCell::YellowOne(extra[0])),
+        _ => Some(CompactCell::Yellows(extra)),
+    };
+
+    (row, extra_cell)
 }
 
 /// Per-word state: same structure as Sanuli for one word (guesses, known_states, known_counts).
@@ -209,8 +244,8 @@ impl Monuli {
         unsolved
     }
 
-    /// Compact row for one word (for monuli list view). SPEC 1.1: per-position greens/yellows.
-    pub fn compact_row(&self, word_index: usize) -> Vec<CompactCell> {
+    /// Compact row for one word (for monuli list view). SPEC 1.1 + 1.2.
+    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactCell>, Option<CompactCell>) {
         match self.words.get(word_index) {
             Some(w) => {
                 let submitted: Vec<_> = w
@@ -220,9 +255,12 @@ impl Monuli {
                     .filter(|row| row.len() == self.word_length)
                     .cloned()
                     .collect();
-                compact_row(&w.word, &submitted)
+                if submitted.is_empty() {
+                    return (vec![CompactCell::Empty; self.word_length], None);
+                }
+                compact_row(&submitted)
             }
-            None => vec![CompactCell::Empty; self.word_length],
+            None => (vec![CompactCell::Empty; self.word_length], None),
         }
     }
 
@@ -717,7 +755,7 @@ impl Game for Monuli {
 mod tests {
     use super::*;
 
-    fn check(word: &str, guesses: &[&str], expected: &[CompactCell]) {
+    fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactCell], expected_extra: Option<CompactCell>) {
         let w: Vec<char> = word.chars().collect();
         let max = guesses.len();
         let mut states = vec![HashMap::new(); max];
@@ -729,8 +767,9 @@ mod tests {
         for (i, row) in rows.iter_mut().enumerate() {
             game::update_known_information(&mut states, &mut counts, row, i, &w, max);
         }
-        let result = compact_row(&w, &rows);
+        let (result, extra) = compact_row(&rows);
         assert_eq!(result, expected, "word={word}, guesses={guesses:?}");
+        assert_eq!(extra, expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
     }
 
     fn g(c: char) -> CompactCell { CompactCell::Green(c) }
@@ -740,17 +779,20 @@ mod tests {
 
     #[test]
     fn compact_row_cases() {
-        // no guesses
-        check("LAHTI", &[], &[E, E, E, E, E]);
         // all green
-        check("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')]);
+        test_compact_row("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')], None);
         // SPEC 1.1.1: two yellows in same cell
-        check("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, ys(&['L', 'H']), g('I')]);
+        test_compact_row("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, ys(&['L', 'H']), g('I')], None);
         // one green, four yellow
-        check("HANHI", &["HIHNA"], &[g('H'), y('I'), y('H'), y('N'), y('A')]);
+        test_compact_row("HANHI", &["HIHNA"], &[g('H'), y('I'), y('H'), y('N'), y('A')], None);
         // duplicate yellow in same position deduped
-        check("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')]);
+        test_compact_row("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')], None);
         // yellow suppressed when letter already green
-        check("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), E, E, g('A')]);
+        test_compact_row("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), E, E, g('A')], None);
+        // yellows shown at guess positions; no budget — both I's stay
+        test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, y('I')], None);
+        // SPEC 1.2: displaced yellows go to extra cell
+        test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"],
+            &[g('M'), g('Ä'), E, E, E], Some(ys(&['Ä', 'R'])));
     }
 }

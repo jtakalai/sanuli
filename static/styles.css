@@ -759,6 +759,11 @@ header {
     font-size: 0.65rem;
 }
 
+.compact-cell-extra-gap {
+    width: 21px;
+    flex-shrink: 0;
+}
+
 .compact-cell-yellows .compact-cell-yellow {
     width: 100%;
     height: 100%;

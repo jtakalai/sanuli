@@ -1,4 +1,4 @@
-# spec version 1.0: monuli
+# määrittely 1.0: monuli
 
 uusi moodi sanuliin: neluli mutta N:lle sanalle, missä N voi olla vaikka 100.
 
@@ -31,12 +31,12 @@ Kukin sana on vain yksi rivi, joka koostaa aiempien arvausten osumat
 	- missä tahansa arvauksessa vihreäksi saatu kirjain on vihreänä paikallaan
 	- yli jäävissä ruuduissa keltaisella näytetään ne jollain arvauksella keltaisiksi saadut kirjaimet, jotka eivät ole vihreällä
 	- jos sama kirjain on jossain arvauksessa ollut monta kertaa, silloin se sama kirjain käsitellään useampana kirjaimena: yksi voi olla vihreä ja toinen keltainen
-	- keltaiset täytetään vasemmalta oikealle ei-vihreisiin ruutuihin
 	- loput ruudut ovat mustia ilman kirjainta
 - voiko niin käydä ettei keltaiset mahdu?
 	- keltaisia ei näytetä, jos on jo vihreä tarjolla; vaikka tietysti ei tiedetä, onko sanassa toinen sama kirjain, jolloin keltainen olisi ok näyttää
 	- tällä tavoin sanan esitys mahtuu 5 (tai 6) laatikkoon, jos mustia ei näytetä; vihreitä plus keltaisia ei voi olla enempää kuin sanassa on kirjaimia koska keltaisia on enintään sanan kirjainten verran, ja jokainen vihreä syö pois joko yhden keltaisen tai yhden mustan ruudun
 	- EI VOI käydä siis
+	- ja muutenkin, keltaisia voi työntää samaan ruutuun enempi, ks. tarkennukset alla
 - entä tilanne, jossa 4 vihreää on löytynyt, ja jäljelle jääväkin kirjain on löytynyt mutta keltainen
 	- silloin se on piirrettävä keltaisella ainoalle jäljelle jäävälle paikalle, vaikkei siinä enää ole arvattavaa
 	- EI HAITTAA, ja saattaahan sana tulla valmiiksi muutenkin vahingossa, kun keltaiset piirretään vahingossa paikoilleen
@@ -73,7 +73,7 @@ Paluunappi monulinäkymään
 		- tällöin tietysti olisi aiemmin nähty, että A:ta on vain yksi
 			- esim. PASTA antaisi yhden vihreän ja yhden mustan A:n
 
-# tarkennuksia: 1.1
+# tarkennus 1.1: monta keltaista samassa ruudussa
 
 Monulinäkymässä pitäisi näkyä, missä kohdissa vääriin kohtiin arvatut kirjaimet ovat. Samaan kohtaan voi tulla useita vääriä arvauksia:
 - esimerkki 1.1.1: oikea sana LAHTI
@@ -97,3 +97,9 @@ esimerkin 1.1.1 kahden arvauksen jälkeen väritys olisi:
     - keltataustainen L
     - keltataustainen H
 - vihreätaustainen I
+
+# tarkennus 1.2: keltainen, joka on jäänyt vihreän alle
+
+Joskus keltainen väärä arvaus jää myöhemmän vihreän arvauksen alle (tai ehkä aiemmankin). Jos sama kirjain on päätynyt keltaiseksi myös muualle, se näytetään mieluummin siellä. Jos taas kirjaimelle ei ole keltaista arvausta ruudussa, jossa ei ole vihreää, se pitää näyttää jotenkin muuten.
+
+Jotta vältetään se, että keltainen olisi hämäävästi väärässä ruudussa, tarvitaan ylimääräinen ruutu keltaisille, jotka ovat jääneet ilman ruutua. Lisäruutu sijoitetaan sanan perään, väliin puolikkaan ruudun levyinen erotin. Jos useampi keltainen on jäänyt ilman ruutua, lisäruutu jaetaan samalla tavalla kuin kohdan 1.1 esimerkissä.

@@ -295,12 +295,30 @@ impl Component for App {
                                                 </div>
                                                 <div class="monuli-word-list">
                                                     { word_order.iter().enumerate().map(|(pos, &word_index)| {
-                                                        let compact = monuli.compact_row(word_index);
+                                                        let (compact, extra) = monuli.compact_row(word_index);
                                                         let is_first_solved = pos == first_solved && first_solved < word_order.len();
                                                         let onselect = link.callback(move |e: MouseEvent| {
                                                             e.prevent_default();
                                                             Msg::SelectMonuliWord(Some(word_index))
                                                         });
+                                                        let render_cell = |cell: &CompactCell| -> Html {
+                                                            match cell {
+                                                                CompactCell::Empty => html! {
+                                                                    <div class="compact-cell compact-cell-empty"></div>
+                                                                },
+                                                                CompactCell::Green(c) => html! {
+                                                                    <div class="compact-cell compact-cell-green">{ c }</div>
+                                                                },
+                                                                CompactCell::YellowOne(c) => html! {
+                                                                    <div class="compact-cell compact-cell-yellow">{ c }</div>
+                                                                },
+                                                                CompactCell::Yellows(chars) => html! {
+                                                                    <div class="compact-cell compact-cell-yellows">
+                                                                        { chars.iter().map(|c| html! { <span class="compact-cell-yellow">{ c }</span> }).collect::<Html>() }
+                                                                    </div>
+                                                                },
+                                                            }
+                                                        };
                                                         html! {
                                                             <>
                                                                 { if is_first_solved {
@@ -308,24 +326,15 @@ impl Component for App {
                                                                 } else { html! {} } }
                                                                 <div class={format!("row-{} monuli-compact-row", word_length)}
                                                                      onmousedown={onselect}>
-                                                                    { compact.iter().map(|cell| {
-                                                                        match cell {
-                                                                            CompactCell::Empty => html! {
-                                                                                <div class="compact-cell compact-cell-empty"></div>
-                                                                            },
-                                                                            CompactCell::Green(c) => html! {
-                                                                                <div class="compact-cell compact-cell-green">{ c }</div>
-                                                                            },
-                                                                            CompactCell::YellowOne(c) => html! {
-                                                                                <div class="compact-cell compact-cell-yellow">{ c }</div>
-                                                                            },
-                                                                            CompactCell::Yellows(chars) => html! {
-                                                                                <div class="compact-cell compact-cell-yellows">
-                                                                                    { chars.iter().map(|c| html! { <span class="compact-cell-yellow">{ c }</span> }).collect::<Html>() }
-                                                                                </div>
-                                                                            },
+                                                                    { compact.iter().map(&render_cell).collect::<Html>() }
+                                                                    { if let Some(ref ex) = extra {
+                                                                        html! {
+                                                                            <>
+                                                                                <div class="compact-cell-extra-gap"></div>
+                                                                                { render_cell(ex) }
+                                                                            </>
                                                                         }
-                                                                    }).collect::<Html>() }
+                                                                    } else { html! {} } }
                                                                 </div>
                                                             </>
                                                         }
