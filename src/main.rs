@@ -45,11 +45,11 @@ pub enum Msg {
     ShareLink,
     RevealHiddenTiles,
     ResetGame,
-    /// (show, optional word_order index to focus when closing)
-    MonuliSetOverview(bool, Option<usize>),
+    /// Move from monuli list view to sanuli view (if given word index), or back to list view (if None).
     SelectMonuliWord(Option<usize>),
     /// ControlKeyPress events can be interpreted by the GameMode to implement a keyboard-driven UI
     ControlKeyPress(ControlKey),
+    /// Auto-sorting helps selecting good words to crack in large monulis
     ToggleAutoSort,
 }
 
@@ -91,8 +91,6 @@ impl Component for App {
                 }
             }
         }
-
-        setup_overview_hover();
 
         if !first_render {
             return;
@@ -244,20 +242,6 @@ impl Component for App {
                     }
                 }
             }
-            Msg::MonuliSetOverview(show, focus_idx) => {
-                if let Some(g) = self.manager.game.as_mut() {
-                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
-                        monuli.show_overview = show;
-                        monuli.selected_word_index = None;
-                        if !show {
-                            if let Some(wo_idx) = focus_idx {
-                                monuli.list_cursor = Some(wo_idx);
-                                monuli.list_scroll_to = Some(wo_idx);
-                            }
-                        }
-                    }
-                }
-            }
             Msg::ControlKeyPress(control_key) => {
                 if let Some(game) = self.manager.game.as_mut() {
                     let msgs = game.control_key_press(control_key);
@@ -348,83 +332,10 @@ impl Component for App {
                                         } else {
                                             html! {}
                                         }
-                                    } else if monuli.show_overview {
-                                        // Overview: compact grid of all words
-                                        let word_length = game.word_length();
-                                        let word_order = monuli.word_order();
-                                        let n_words = word_order.len();
-                                        let current_letters: Vec<char> = last_guess.chars().collect();
-
-                                        let show_letters = n_words <= 20;
-
-                                        let render_overview_cell = move |cell: &CompactTile| -> Html {
-                                            let (class, letter) = match cell {
-                                                CompactTile::Empty => ("overview-cell overview-cell-empty", None),
-                                                CompactTile::Absent(c) => ("overview-cell overview-cell-empty", if show_letters { Some(*c) } else { None }),
-                                                CompactTile::Correct(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
-                                                CompactTile::Yellow(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
-                                                CompactTile::Brown(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
-                                                CompactTile::Multi(_ys, _bs, _as) => ("overview-cell overview-cell-yellow", None),
-                                            };
-                                            if let Some(ch) = letter {
-                                                html! { <div class={class}>{ ch }</div> }
-                                            } else {
-                                                html! { <div class={class}></div> }
-                                            }
-                                        };
-
-                                        let cell_size = if n_words <= 20 { 16 } else if n_words <= 50 { 10 } else { 7 };
-                                        let row_width = word_length * cell_size + (word_length - 1) * 2;
-                                        let style_var = format!("--overview-cell-size: {}px; --overview-row-width: {}px;", cell_size, row_width);
-
-                                        // Transpose word_order into column-major order for 4-column grid
-                                        let cols = 4usize;
-                                        let k = (n_words + cols - 1) / cols;
-                                        let mut transposed: Vec<(Option<usize>, usize)> = Vec::with_capacity(k * cols);
-                                        for row in 0..k {
-                                            for col in 0..cols {
-                                                let src = col * k + row;
-                                                let wo_idx = word_order.get(src).copied();
-                                                transposed.push((wo_idx, src));
-                                            }
-                                        }
-
-                                        html! {
-                                            <div class="monuli-list-view">
-                                                <div class={format!("row-{}", word_length)}>
-                                                    { (0..word_length).map(|i| {
-                                                        let c = current_letters.get(i).copied().unwrap_or(' ');
-                                                        html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
-                                                    }).collect::<Html>() }
-                                                </div>
-                                                <div class="monuli-overview-grid" style={style_var}
-                                                     data-k={k.to_string()} data-cols={cols.to_string()} data-n={n_words.to_string()}>
-                                                    { transposed.iter().map(|&(opt_word_index, wo_idx)| {
-                                                        if let Some(_word_index) = opt_word_index {
-                                                            let (compact, _extra) = monuli.compact_row(_word_index);
-                                                            let onclick = link.callback(move |e: MouseEvent| {
-                                                                e.prevent_default();
-                                                                Msg::MonuliSetOverview(false, Some(wo_idx))
-                                                            });
-                                                            html! {
-                                                                <div class="overview-row"
-                                                                     data-wo={wo_idx.to_string()}
-                                                                     onmousedown={onclick}>
-                                                                    { compact.iter().map(&render_overview_cell).collect::<Html>() }
-                                                                </div>
-                                                            }
-                                                        } else {
-                                                            html! { <div class="overview-row overview-row-empty"></div> }
-                                                        }
-                                                    }).collect::<Html>() }
-                                                </div>
-                                            </div>
-                                        }
                                     } else {
                                         // List view: single column, scrollable
                                         let word_length = game.word_length();
                                         let word_order = monuli.word_order();
-                                        let n_words = word_order.len();
                                         let current_letters: Vec<char> = last_guess.chars().collect();
                                         let mut first_solved = word_order.len();
                                         for (pos, &idx) in word_order.iter().enumerate() {
@@ -435,11 +346,6 @@ impl Component for App {
                                         }
 
                                         let list_cursor = monuli.list_cursor;
-                                        let has_overview = n_words > 10;
-                                        let on_show_all = link.callback(move |e: MouseEvent| {
-                                            e.prevent_default();
-                                            Msg::MonuliSetOverview(true, None)
-                                        });
 
                                         html! {
                                             <div class="monuli-list-view">
@@ -449,13 +355,6 @@ impl Component for App {
                                                         html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
                                                     }).collect::<Html>() }
                                                 </div>
-                                                { if has_overview {
-                                                    html! {
-                                                        <button class="monuli-back-button monuli-overview-btn" onmousedown={on_show_all}>
-                                                            {"NÄYTÄ KAIKKI"}
-                                                        </button>
-                                                    }
-                                                } else { html! {} } }
                                                 <div class="monuli-word-list">
                                                     { word_order.iter().enumerate().map(|(pos, &word_index)| {
                                                         let (compact, extras) = monuli.compact_row(word_index);
@@ -750,97 +649,6 @@ fn ensure_sanuli_current_visible() {
                     container.set_scroll_top(new_scroll as i32);
                 }
             }
-        }
-    }
-}
-
-/// Set up hover highlighting on the overview grid via direct DOM manipulation.
-/// Runs every render; uses a data attribute to avoid re-attaching listeners.
-fn setup_overview_hover() {
-    let document = match window().and_then(|w| w.document()) {
-        Some(d) => d,
-        None => return,
-    };
-    let grid = match document.query_selector(".monuli-overview-grid").ok().flatten() {
-        Some(g) => g,
-        None => return,
-    };
-    if grid.get_attribute("data-hover-init").is_some() {
-        return;
-    }
-    grid.set_attribute("data-hover-init", "1").ok();
-
-    let grid_el = grid.clone();
-    let on_enter: Closure<dyn Fn(web_sys::MouseEvent)> = Closure::new(move |e: web_sys::MouseEvent| {
-        let target = match e.target() {
-            Some(t) => t,
-            None => return,
-        };
-        let row_el = match target.dyn_ref::<web_sys::Element>()
-            .and_then(|el| el.closest(".overview-row").ok().flatten()) {
-            Some(r) => r,
-            None => return,
-        };
-        let wo: usize = match row_el.get_attribute("data-wo").and_then(|s| s.parse().ok()) {
-            Some(v) => v,
-            None => return,
-        };
-        let k: usize = grid_el.get_attribute("data-k").and_then(|s| s.parse().ok()).unwrap_or(1);
-        let cols: usize = grid_el.get_attribute("data-cols").and_then(|s| s.parse().ok()).unwrap_or(4);
-        let n: usize = grid_el.get_attribute("data-n").and_then(|s| s.parse().ok()).unwrap_or(0);
-
-        let hover_col = wo / k;
-        let hover_row_in_col = wo % k;
-        let col_len = if hover_col < cols - 1 || n % k == 0 { k } else { n % k };
-
-        clear_overview_highlights(&grid_el);
-        for offset in 0..=4usize {
-            let up = (hover_row_in_col + col_len - (offset % col_len)) % col_len;
-            let down = (hover_row_in_col + offset) % col_len;
-            for idx in [hover_col * k + up, hover_col * k + down] {
-                let selector = format!(".overview-row[data-wo=\"{}\"]", idx);
-                if let Some(el) = grid_el.query_selector(&selector).ok().flatten() {
-                    add_css_class(&el, "overview-row-highlight");
-                }
-            }
-        }
-        add_css_class(&row_el, "overview-row-hovered");
-    });
-
-    let grid_el2 = grid.clone();
-    let on_leave: Closure<dyn Fn(web_sys::MouseEvent)> = Closure::new(move |_: web_sys::MouseEvent| {
-        clear_overview_highlights(&grid_el2);
-    });
-
-    grid.add_event_listener_with_callback("mouseover", on_enter.as_ref().unchecked_ref()).ok();
-    grid.add_event_listener_with_callback("mouseleave", on_leave.as_ref().unchecked_ref()).ok();
-    on_enter.forget();
-    on_leave.forget();
-}
-
-fn add_css_class(el: &web_sys::Element, class: &str) {
-    let current = el.get_attribute("class").unwrap_or_default();
-    if !current.split_whitespace().any(|c| c == class) {
-        el.set_attribute("class", &format!("{} {}", current, class)).ok();
-    }
-}
-
-fn remove_css_class(el: &web_sys::Element, class: &str) {
-    if let Some(current) = el.get_attribute("class") {
-        let new: String = current.split_whitespace()
-            .filter(|c| *c != class)
-            .collect::<Vec<_>>()
-            .join(" ");
-        el.set_attribute("class", &new).ok();
-    }
-}
-
-fn clear_overview_highlights(grid: &web_sys::Element) {
-    let children = grid.children();
-    for i in 0..children.length() {
-        if let Some(child) = children.item(i) {
-            remove_css_class(&child, "overview-row-highlight");
-            remove_css_class(&child, "overview-row-hovered");
         }
     }
 }

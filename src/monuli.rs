@@ -209,8 +209,6 @@ pub struct Monuli {
     word_lists: Rc<WordLists>,
     /// When Some(i), sanuli view for word i; input applies only to that word. None = list view.
     pub selected_word_index: Option<usize>,
-    /// When true and selected_word_index is None, show overview instead of list view.
-    pub show_overview: bool,
     /// Cursor position in the list view (index into word_order()). None = nothing selected.
     pub list_cursor: Option<usize>,
     /// After switching from overview to list, scroll to center this word_order index.
@@ -236,7 +234,6 @@ impl Monuli {
     /// Move from monuli list view to sanuli view
     pub fn select_monuli_word(&mut self, word_index: usize) {
         self.selected_word_index = Some(word_index);
-        self.show_overview = false;
     }
 
     /// Move from sanuli view to monuli list view
@@ -443,7 +440,6 @@ impl Monuli {
             allow_profanities: true,
             word_lists,
             selected_word_index: None,
-            show_overview: n_words > 20,
             list_cursor: None,
             list_scroll_to: None,
             list_ensure_visible: None,
@@ -482,7 +478,6 @@ impl Monuli {
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
         game.selected_word_index = None;
-        game.show_overview = game.n_words > 20;
         game.list_cursor = None;
         game.refresh();
         Ok(game)
@@ -693,10 +688,6 @@ impl Game for Monuli {
                     self.list_cursor = Some(new_cursor);
                     self.list_ensure_visible = Some(new_cursor);
                 }
-                if self.show_overview {
-                    self.show_overview = false;
-                    self.list_scroll_to = self.list_cursor;
-                }
                 vec![]
             }
             ControlKey::ArrowDown => {
@@ -714,10 +705,6 @@ impl Game for Monuli {
                     };
                     self.list_cursor = Some(new_cursor);
                     self.list_ensure_visible = Some(new_cursor);
-                }
-                if self.show_overview {
-                    self.show_overview = false;
-                    self.list_scroll_to = self.list_cursor;
                 }
                 vec![]
             }
