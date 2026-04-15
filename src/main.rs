@@ -441,10 +441,11 @@ impl Component for App {
                                         let render_overview_cell = move |cell: &CompactTile| -> Html {
                                             let (class, letter) = match cell {
                                                 CompactTile::Empty => ("overview-cell overview-cell-empty", None),
+                                                CompactTile::Absent(c) => ("overview-cell overview-cell-empty", if show_letters { Some(*c) } else { None }),
                                                 CompactTile::Correct(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
                                                 CompactTile::Yellow(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
                                                 CompactTile::Brown(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
-                                                CompactTile::Multi(_ys, _bs) => ("overview-cell overview-cell-yellow", None),
+                                                CompactTile::Multi(_ys, _bs, _as) => ("overview-cell overview-cell-yellow", None),
                                             };
                                             if let Some(ch) = letter {
                                                 html! { <div class={class}>{ ch }</div> }
@@ -549,6 +550,9 @@ impl Component for App {
                                                                 CompactTile::Empty => html! {
                                                                     <div class="compact-cell"></div>
                                                                 },
+                                                                CompactTile::Absent(c) => html! {
+                                                                    <div class="compact-cell absent">{ c }</div>
+                                                                },
                                                                 CompactTile::Correct(c) => html! {
                                                                     <div class="compact-cell correct">{ c }</div>
                                                                 },
@@ -558,12 +562,16 @@ impl Component for App {
                                                                 CompactTile::Brown(c) => html! {
                                                                     <div class="compact-cell maybe-present">{ c }</div>
                                                                 },
-                                                                CompactTile::Multi(ys, bs) => html! {
+                                                                CompactTile::Multi(ys, bs, aas) => html! {
                                                                     <div class="compact-cell compact-cell-multi">
-                                                                        { ys.iter().map(|&c| html! {
-                                                                            <span class="present">{ c }</span>
-                                                                        }).chain(bs.iter().map(|&c| html! {
-                                                                            <span class="maybe-present">{ c }</span> })).collect::<Html>()
+                                                                        {
+                                                                            ys.iter().map(|&c| html! {
+                                                                                <span class="present">{ c }</span>
+                                                                            }).chain(bs.iter().map(|&c| html! {
+                                                                                <span class="maybe-present">{ c }</span>
+                                                                            })).chain(aas.iter().map(|&c| html! {
+                                                                                <span class="absent">{ c }</span>
+                                                                            })).collect::<Html>()
                                                                         }
                                                                     </div>
                                                                 },

@@ -134,7 +134,15 @@ Käydään läpi tapauksia eri määrillä värejä arvausten ruuduissa:
 - keltaisia 1, vihreitä 1, nähty 2, ei havaittu väärää: kirjainta on vähintään 2, näytetään keltainen keltaisessa ruudussa tai lisäruudussa (jos vihreän peittämä)
 - keltaisia 2, vihreitä 0, nähty 1, havaittu väärä: kirjainta on tasan 1, näytetään yksi keltainen ja loput ruskeana
 
-# 1.4: cleanup
+# 1.4: harmaat kirjaimet
+
+Monulissa voisi silti olla paikka harmaille kirjaimille: jos TIEDETÄÄN, että kirjaimia on vain tietty määrä, ja silti on enemmän vääriä paikkoja kuin keltaisia. Tällöin ei ole järkeä näyttää ruskeaa vaan kannattaisi käyttää harmaata. Ruskea on tällöin merkitykseltään "ehkä sanassa" (maybe-present), harmaa olisi "ei sanassa" (absent).
+
+Esimerkki 1.4.1: sana on PISIN
+- arvaus: HIISI
+- tulos monulirivissä olisi tällöin suunnilleen sama kuin sanulirivissä: tyhjä, vihreä I, keltainen I, keltainen S, harmaa I
+
+# 2.0: cleanup sanuli-PR:ää varten
 
 Poistetaan overview cursor, joka aiheutti kamalasti noisea main.rs:ään. Monuli-projektin tavoite on koskea Sanuli-koodiin mahdollisimman vähän.
 

@@ -184,6 +184,15 @@ pub enum CharacterCount {
     Exactly(usize),
 }
 
+impl From<CharacterCount> for usize {
+    fn from(count: CharacterCount) -> usize {
+        match count {
+            CharacterCount::AtLeast(n) => n,
+            CharacterCount::Exactly(n) => n,
+        }
+    }
+}
+
 #[derive(PartialEq, Serialize, Deserialize)]
 pub struct Manager {
     pub current_game_mode: GameMode,
