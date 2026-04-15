@@ -201,20 +201,8 @@ impl Default for Monuli {
 }
 
 impl Monuli {
-    pub fn n_words(&self) -> usize {
-        self.n_words
-    }
-
     pub fn max_guesses(&self) -> usize {
         self.n_words + 1
-    }
-
-    pub fn current_guess_index(&self) -> usize {
-        self.current_guess
-    }
-
-    pub fn word_state(&self, word_index: usize) -> Option<&MonuliWordState> {
-        self.words.get(word_index)
     }
 
     pub fn word_is_solved(&self, word_index: usize) -> bool {
