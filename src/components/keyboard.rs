@@ -24,6 +24,10 @@ pub struct Props {
 
     pub game_mode: GameMode,
 
+    /// When true (Monuli sanuli view), show Back button to return to list view.
+    #[prop_or_default]
+    pub show_monuli_back: bool,
+
     pub message: String,
     pub word: String,
     pub last_guess: String,
@@ -121,7 +125,20 @@ pub fn keyboard(props: &Props) -> Html {
                     }).collect::<Html>()
                 }
                 {
-                    if props.is_guessing {
+                    if props.show_monuli_back {
+                        let callback = props.callback.clone();
+                        let onmousedown = Callback::from(move |e: MouseEvent| {
+                            e.prevent_default();
+                            callback.emit(Msg::SelectMonuliWord(None));
+                        });
+
+                        html! {
+                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
+                                onmousedown={onmousedown}>
+                                { "TAKAISIN" }
+                            </button>
+                        }
+                    } else if props.is_guessing {
                         let callback = props.callback.clone();
                         let onmousedown = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();

@@ -6,6 +6,7 @@ use yew::prelude::*;
 mod components;
 mod game;
 mod manager;
+mod monuli;
 mod neluli;
 mod sanuli;
 
@@ -16,6 +17,7 @@ use components::{
     modal::{HelpModal, MenuModal},
 };
 use manager::{GameMode, KeyState, Manager, Theme, WordList};
+use monuli::{CompactCell, Monuli};
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -40,6 +42,7 @@ pub enum Msg {
     ShareLink,
     RevealHiddenTiles,
     ResetGame,
+    SelectMonuliWord(Option<usize>),
 }
 
 pub struct App {
@@ -201,6 +204,11 @@ impl Component for App {
             }
             Msg::RevealHiddenTiles => self.manager.reveal_hidden_tiles(),
             Msg::ResetGame => self.manager.reset_game(),
+            Msg::SelectMonuliWord(idx) => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    g.set_monuli_selected_word(idx);
+                }
+            }
         };
 
         true
@@ -209,14 +217,23 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         if let Some(game) = &self.manager.game {
-            let keyboard_state = ALLOWED_KEYS
-                .iter()
-                .map(|key| (*key, game.keyboard_tilestate(key)))
-                .collect::<HashMap<char, KeyState>>();
+            let keyboard_state: HashMap<char, KeyState> = match (game.game_mode(), game.monuli_selected_word()) {
+                (GameMode::Monuli(_), Some(idx)) => ALLOWED_KEYS
+                    .iter()
+                    .map(|key| (*key, game.keyboard_tilestate_for_word(idx, key)))
+                    .collect(),
+                _ => ALLOWED_KEYS
+                    .iter()
+                    .map(|key| (*key, game.keyboard_tilestate(key)))
+                    .collect(),
+            };
 
             let last_guess = game.last_guess();
 
             let boards = game.boards();
+
+            let show_monuli_back = matches!(game.game_mode(), GameMode::Monuli(_))
+                && game.monuli_selected_word().is_some();
 
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
@@ -227,8 +244,93 @@ impl Component for App {
                     />
 
                     {
-                        match boards.len() {
-                            1 => html! {
+                        match (game.game_mode(), boards.len()) {
+                            (GameMode::Monuli(_), _) => {
+                                if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
+                                    if let Some(word_idx) = monuli.selected_word_index {
+                                        if let Some(board) = game.board_for_word(word_idx) {
+                                            html! {
+                                                <div class="board-container">
+                                                    <Board
+                                                        guesses={board.guesses}
+                                                        is_guessing={board.is_guessing}
+                                                        current_guess={board.current_guess}
+                                                        is_reset={false}
+                                                        is_hidden={false}
+                                                        previous_guesses={vec![]}
+                                                        max_guesses={game.max_guesses()}
+                                                        word_length={game.word_length()}
+                                                    />
+                                                </div>
+                                            }
+                                        } else {
+                                            html! {}
+                                        }
+                                    } else {
+                                        let word_length = game.word_length();
+                                        let word_order = monuli.word_order();
+                                        let current_letters: Vec<char> = last_guess.chars().collect();
+                                        let mut first_solved = word_order.len();
+                                        for (pos, &idx) in word_order.iter().enumerate() {
+                                            if monuli.word_is_solved(idx) {
+                                                first_solved = pos;
+                                                break;
+                                            }
+                                        }
+                                        html! {
+                                            <div class="monuli-list-view">
+                                                <div class={format!("row-{}", word_length)}>
+                                                    { (0..word_length).map(|i| {
+                                                        let c = current_letters.get(i).copied().unwrap_or(' ');
+                                                        html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
+                                                    }).collect::<Html>() }
+                                                </div>
+                                                <div class="monuli-word-list">
+                                                    { word_order.iter().enumerate().map(|(pos, &word_index)| {
+                                                        let compact = monuli.compact_row(word_index);
+                                                        let is_first_solved = pos == first_solved && first_solved < word_order.len();
+                                                        let onselect = link.callback(move |e: MouseEvent| {
+                                                            e.prevent_default();
+                                                            Msg::SelectMonuliWord(Some(word_index))
+                                                        });
+                                                        html! {
+                                                            <>
+                                                                { if is_first_solved {
+                                                                    html! { <div class="monuli-separator"></div> }
+                                                                } else { html! {} } }
+                                                                <div class={format!("row-{} monuli-compact-row", word_length)}
+                                                                     onmousedown={onselect}>
+                                                                    { compact.iter().map(|cell| {
+                                                                        match cell {
+                                                                            CompactCell::Empty => html! {
+                                                                                <div class="compact-cell compact-cell-empty"></div>
+                                                                            },
+                                                                            CompactCell::Green(c) => html! {
+                                                                                <div class="compact-cell compact-cell-green">{ c }</div>
+                                                                            },
+                                                                            CompactCell::YellowOne(c) => html! {
+                                                                                <div class="compact-cell compact-cell-yellow">{ c }</div>
+                                                                            },
+                                                                            CompactCell::Yellows(chars) => html! {
+                                                                                <div class="compact-cell compact-cell-yellows">
+                                                                                    { chars.iter().map(|c| html! { <span class="compact-cell-yellow">{ c }</span> }).collect::<Html>() }
+                                                                                </div>
+                                                                            },
+                                                                        }
+                                                                    }).collect::<Html>() }
+                                                                </div>
+                                                            </>
+                                                        }
+                                                    }).collect::<Html>() }
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                } else {
+                                    html! { <div class="board-container"><p class="monuli-placeholder">{"Monuli"}</p></div> }
+                                }
+                            },
+                            (_, 1) => html! {
                                 <div class="board-container">
                                     <Board
                                         guesses={boards[0].guesses.clone()}
@@ -242,7 +344,7 @@ impl Component for App {
                                     />
                                 </div>
                             },
-                            4 => html! {
+                            (_, 4) => html! {
                                 <div class="quadruple-container">
                                     <div class="quadruple-grid">
                                         {game.boards().iter().map(|board| {
@@ -275,6 +377,7 @@ impl Component for App {
                         is_emojis_copied={self.is_emojis_copied}
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
+                        show_monuli_back={show_monuli_back}
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}
                         last_guess={last_guess}

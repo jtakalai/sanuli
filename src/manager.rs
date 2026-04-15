@@ -12,6 +12,7 @@ use wasm_bindgen::JsValue;
 use web_sys::{window, Window};
 
 use crate::game::Game;
+use crate::monuli::Monuli;
 use crate::neluli::Neluli;
 use crate::sanuli::Sanuli;
 
@@ -106,6 +107,7 @@ pub enum GameMode {
     DailyWord(NaiveDate),
     Shared,
     Quadruple,
+    Monuli(usize),
 }
 
 impl Default for GameMode {
@@ -133,12 +135,14 @@ pub enum CharacterState {
     Unknown,
 }
 
-#[derive(Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TileState {
     Correct,
     Absent,
     Present,
     Unknown,
+    /// Monuli list view: key has been used in some guess (style e.g. light blue).
+    Used,
 }
 
 impl fmt::Display for TileState {
@@ -148,6 +152,7 @@ impl fmt::Display for TileState {
             TileState::Absent => write!(f, "absent"),
             TileState::Present => write!(f, "present"),
             TileState::Unknown => write!(f, "unknown"),
+            TileState::Used => write!(f, "used"),
         }
     }
 }
@@ -256,6 +261,15 @@ impl Manager {
                 }
                 GameMode::Quadruple => {
                     manager.game = Some(Box::new(Neluli::new_or_rehydrate(
+                        manager.current_word_list,
+                        manager.current_word_length,
+                        manager.allow_profanities,
+                        word_lists.clone(),
+                    )));
+                }
+                GameMode::Monuli(n) => {
+                    manager.game = Some(Box::new(Monuli::new_or_rehydrate(
+                        n,
                         manager.current_word_list,
                         manager.current_word_length,
                         manager.allow_profanities,
@@ -510,6 +524,13 @@ impl Manager {
                     ))
                 }
                 GameMode::Quadruple => Box::new(Neluli::new_or_rehydrate(
+                    next_game.1,
+                    next_game.2,
+                    self.allow_profanities,
+                    self.word_lists.clone(),
+                )),
+                GameMode::Monuli(n) => Box::new(Monuli::new_or_rehydrate(
+                    n,
                     next_game.1,
                     next_game.2,
                     self.allow_profanities,

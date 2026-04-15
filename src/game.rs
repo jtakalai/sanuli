@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 
 use gloo_storage::errors::StorageError;
@@ -47,6 +48,24 @@ pub trait Game {
 
     fn message(&self) -> String;
     fn previous_guesses(&self) -> Vec<Vec<(char, TileState)>>;
+
+    /// When in Monuli and a word is selected for sanuli view. None = list view.
+    fn monuli_selected_word(&self) -> Option<usize> {
+        None
+    }
+    /// Set selected word for Monuli sanuli view. No-op for other games.
+    fn set_monuli_selected_word(&mut self, _index: Option<usize>) {}
+    /// Board for one word (Monuli sanuli view). None for other games or invalid index.
+    fn board_for_word(&self, _word_index: usize) -> Option<Board> {
+        None
+    }
+    /// Keyboard state for one word (Monuli sanuli view). Default: Unknown.
+    fn keyboard_tilestate_for_word(&self, _word_index: usize, _key: &char) -> KeyState {
+        KeyState::Single(TileState::Unknown)
+    }
+
+    /// For downcasting to concrete game type (e.g. Monuli in view).
+    fn as_any(&self) -> &dyn Any;
 }
 
 impl PartialEq for dyn Game {

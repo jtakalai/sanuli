@@ -337,6 +337,10 @@ impl Game for Neluli {
         }
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     fn persist(&self) -> Result<(), StorageError> {
         let game_key = &format!(
             "game|{}|{}|{}",

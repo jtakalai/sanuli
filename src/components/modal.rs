@@ -131,6 +131,9 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
         onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
     let change_game_mode_quadruple =
         onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
+    const MONULI_N: usize = 10;
+    let change_game_mode_monuli =
+        onmousedown!(callback, Msg::ChangeGameMode(GameMode::Monuli(MONULI_N)));
 
     let change_word_list_easy = onmousedown!(callback, Msg::ChangeWordList(WordList::Easy));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
@@ -142,7 +145,10 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let change_theme_dark = onmousedown!(callback, Msg::ChangeTheme(Theme::Dark));
     let change_theme_colorblind = onmousedown!(callback, Msg::ChangeTheme(Theme::Colorblind));
 
-    let is_hide_settings = matches!(props.game_mode, GameMode::DailyWord(_) | GameMode::Shared);
+    let is_hide_settings = matches!(
+        props.game_mode,
+        GameMode::DailyWord(_) | GameMode::Shared | GameMode::Monuli(_)
+    );
 
     html! {
         <div class="modal">
@@ -212,6 +218,10 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <button class={classes!("select", (props.game_mode == GameMode::Quadruple).then(|| Some("select-active")))}
                         onmousedown={change_game_mode_quadruple}>
                         {"Neluli"}
+                    </button>
+                    <button class={classes!("select", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
+                        onmousedown={change_game_mode_monuli}>
+                        {"Monuli"}
                     </button>
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>

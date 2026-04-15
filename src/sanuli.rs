@@ -606,7 +606,7 @@ impl Game for Sanuli {
                             _ => "🟨",
                         },
                         TileState::Absent => "⬛",
-                        TileState::Unknown => "⬜",
+                        TileState::Unknown | TileState::Used => "⬜",
                     })
                     .collect::<String>();
 
@@ -703,6 +703,10 @@ impl Game for Sanuli {
                 self.max_guesses,
             );
         }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 
     fn persist(&self) -> Result<(), StorageError> {
