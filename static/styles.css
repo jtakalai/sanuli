@@ -505,6 +505,9 @@ header {
         font-size: 0.9rem;
         line-height: 0.9rem;
     }
+    .monuli-sanuli-view > div[class*="board-"] {
+        width: 240px;
+    }
     .keyboard-button {
         margin-right: 4px;
     }
@@ -694,6 +697,26 @@ header {
 
 .monuli-back-button:hover {
     background: var(--absent);
+}
+
+.monuli-sanuli-view > div[class*="board-"] {
+    position: absolute;
+    display: grid;
+    grid-auto-rows: 1fr;
+    width: 300px;
+    height: 90%;
+    max-height: 500px;
+    grid-gap: 3px;
+    padding: 6px;
+    box-sizing: border-box;
+}
+
+.monuli-sanuli-view .tile {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    font-size: 1.1rem;
+    line-height: 1.1rem;
 }
 
 /* Monuli list view */

@@ -267,7 +267,7 @@ impl Component for App {
                                                             {"← TAKAISIN"}
                                                         </button>
                                                     </div>
-                                                    <div class="board-container">
+                                                    <div class="board-container monuli-sanuli-view">
                                                         <Board
                                                             guesses={board.guesses}
                                                             is_guessing={board.is_guessing}
