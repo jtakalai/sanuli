@@ -253,13 +253,24 @@ impl Component for App {
             Msg::ResetGame => self.manager.reset_game(),
             Msg::SelectMonuliWord(idx) => {
                 if let Some(g) = self.manager.game.as_mut() {
-                    if let (Some(word_idx), Some(monuli)) = (idx, g.as_any_mut().downcast_mut::<Monuli>()) {
-                        if monuli.word_is_solved(word_idx) {
-                            monuli.list_cursor = None;
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        if let Some(word_idx) = idx {
+                            let cursor_was_active = monuli.list_cursor.is_some();
+                            if monuli.word_is_solved(word_idx) {
+                                monuli.list_cursor = None;
+                            } else if cursor_was_active {
+                                let order = monuli.word_order();
+                                if let Some(pos) = order.iter().position(|&i| i == word_idx) {
+                                    monuli.list_cursor = Some(pos);
+                                }
+                            }
                         } else {
-                            let order = monuli.word_order();
-                            if let Some(pos) = order.iter().position(|&i| i == word_idx) {
-                                monuli.list_cursor = Some(pos);
+                            // Returning from single word view: scroll to the previously selected word
+                            if let Some(prev_idx) = monuli.selected_word_index {
+                                let order = monuli.word_order();
+                                if let Some(pos) = order.iter().position(|&i| i == prev_idx) {
+                                    monuli.list_scroll_to = Some(pos);
+                                }
                             }
                         }
                     }
@@ -370,16 +381,10 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         if let Some(game) = &self.manager.game {
-            let keyboard_state: HashMap<char, KeyState> = match (game.game_mode(), game.monuli_selected_word()) {
-                (GameMode::Monuli(_), Some(idx)) => ALLOWED_KEYS
-                    .iter()
-                    .map(|key| (*key, game.keyboard_tilestate_for_word(idx, key)))
-                    .collect(),
-                _ => ALLOWED_KEYS
-                    .iter()
-                    .map(|key| (*key, game.keyboard_tilestate(key)))
-                    .collect(),
-            };
+            let keyboard_state: HashMap<char, KeyState> = ALLOWED_KEYS
+                .iter()
+                .map(|key| (*key, game.keyboard_tilestate(key)))
+                .collect();
 
             let last_guess = game.last_guess();
 

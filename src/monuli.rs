@@ -582,8 +582,19 @@ impl Game for Monuli {
         let _ = self.persist();
     }
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
-        if self.selected_word_index.is_some() {
-            return KeyState::Single(TileState::Unknown);
+        if let Some(word_index) = self.selected_word_index {
+            match self.words.get(word_index) {
+                Some(w) => {
+                    let idx = self.current_guess.min(w.known_states.len() - 1);
+                    return KeyState::Single(game::keyboard_tile_state(
+                        key,
+                        idx,
+                        &w.known_states,
+                        &w.known_counts,
+                    ));
+                }
+                None => return KeyState::Single(TileState::Unknown),
+            }
         }
         // List view: used = light blue, absent from all unsolved = black.
         let used: HashSet<char> = self
@@ -646,20 +657,6 @@ impl Game for Monuli {
                 current_guess: self.current_guess,
                 is_guessing: self.is_guessing(),
             })
-        }
-    }
-    fn keyboard_tilestate_for_word(&self, word_index: usize, key: &char) -> KeyState {
-        match self.words.get(word_index) {
-            Some(w) => {
-                let idx = self.current_guess.min(w.known_states.len() - 1);
-                KeyState::Single(game::keyboard_tile_state(
-                    key,
-                    idx,
-                    &w.known_states,
-                    &w.known_counts,
-                ))
-            }
-            None => KeyState::Single(TileState::Unknown),
         }
     }
     fn submit_guess(&mut self) {
@@ -884,10 +881,7 @@ mod tests {
         assert_eq!(m.max_guesses(), 9);
         assert!(m.is_guessing());
 
-        // First guess: a throwaway (can't solve on first guess due to replacement rule).
-        // Use "LAHTI" which is in our word list; it will be replaced since it matches word 0.
-        // Use a neutral word instead — add it to word list.
-        // Actually, let's just add an extra word to the word list for the first guess.
+        // Add a throwaway word to the word list for the first guess.
         let extra: Vec<char> = "TAKKI".chars().collect();
         if let Some(list) = Rc::get_mut(&mut m.word_lists) {
             list.get_mut(&(WordList::Full, 5)).unwrap().insert(extra.clone());
@@ -897,8 +891,6 @@ mod tests {
         assert_eq!(m.current_guess, 1);
         assert!(m.is_guessing());
 
-        // Now solve each word one by one (cheating: guess the correct answer).
-        // In Monuli, all unsolved words receive each guess, so guessing word[i] solves it.
         for i in 0..8 {
             assert!(m.is_guessing(), "should still be guessing before solving word {i}");
             type_and_submit(&mut m, words[i]);
@@ -908,7 +900,8 @@ mod tests {
             );
             // keyboard_tilestate_for_word must not panic even after the game ends
             for &c in &['A', 'B', 'C'] {
-                let _ = m.keyboard_tilestate_for_word(i, &c);
+                m.selected_word_index = Some(i);
+                let _ = m.keyboard_tilestate(&c);
             }
         }
 
@@ -919,7 +912,8 @@ mod tests {
         // After game ends, keyboard_tilestate_for_word must still work
         for wi in 0..8 {
             for &c in &['A', 'L', 'H', 'T', 'I'] {
-                let _ = m.keyboard_tilestate_for_word(wi, &c);
+                m.selected_word_index = Some(wi);
+                let _ = m.keyboard_tilestate(&c);
             }
         }
     }
