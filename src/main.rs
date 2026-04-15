@@ -19,7 +19,7 @@ use components::{
     modal::{HelpModal, MenuModal},
 };
 use manager::{GameMode, KeyState, Manager, Theme, WordList};
-use monuli::{CompactTileState, Monuli};
+use monuli::{CompactTile, Monuli};
 
 const ALLOWED_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -438,13 +438,13 @@ impl Component for App {
 
                                         let show_letters = n_words <= 20;
 
-                                        let render_overview_cell = move |cell: &CompactTileState| -> Html {
+                                        let render_overview_cell = move |cell: &CompactTile| -> Html {
                                             let (class, letter) = match cell {
-                                                CompactTileState::Empty => ("overview-cell overview-cell-empty", None),
-                                                CompactTileState::Green(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
-                                                CompactTileState::Yellow(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
-                                                CompactTileState::Brown(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
-                                                CompactTileState::Yellows(_ys, _bs) => ("overview-cell overview-cell-yellow", None),
+                                                CompactTile::Empty => ("overview-cell overview-cell-empty", None),
+                                                CompactTile::Correct(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
+                                                CompactTile::Yellow(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
+                                                CompactTile::Brown(c) => ("overview-cell overview-cell-brown", if show_letters { Some(*c) } else { None }),
+                                                CompactTile::Multi(_ys, _bs) => ("overview-cell overview-cell-yellow", None),
                                             };
                                             if let Some(ch) = letter {
                                                 html! { <div class={class}>{ ch }</div> }
@@ -544,21 +544,21 @@ impl Component for App {
                                                             e.prevent_default();
                                                             Msg::SelectMonuliWord(Some(word_index))
                                                         });
-                                                        let render_cell = |cell: &CompactTileState| -> Html {
+                                                        let render_cell = |cell: &CompactTile| -> Html {
                                                             match cell {
-                                                                CompactTileState::Empty => html! {
+                                                                CompactTile::Empty => html! {
                                                                     <div class="compact-cell compact-cell-empty"></div>
                                                                 },
-                                                                CompactTileState::Green(c) => html! {
+                                                                CompactTile::Correct(c) => html! {
                                                                     <div class="compact-cell compact-cell-green">{ c }</div>
                                                                 },
-                                                                CompactTileState::Yellow(c) => html! {
+                                                                CompactTile::Yellow(c) => html! {
                                                                     <div class="compact-cell compact-cell-yellow">{ c }</div>
                                                                 },
-                                                                CompactTileState::Brown(c) => html! {
+                                                                CompactTile::Brown(c) => html! {
                                                                     <div class="compact-cell compact-cell-brown">{ c }</div>
                                                                 },
-                                                                CompactTileState::Yellows(ys, bs) => html! {
+                                                                CompactTile::Multi(ys, bs) => html! {
                                                                     <div class="compact-cell compact-cell-yellows">
                                                                         { ys.iter().map(|&c| html! {
                                                                             <span class="compact-cell-yellow">{ c }</span>

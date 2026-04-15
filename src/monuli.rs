@@ -15,14 +15,14 @@ use crate::manager::{
 
 /// One cell in a compact row (SPEC 1.1). Each tile is either green, one or more yellows/browns, or empty.
 #[derive(Clone, Debug, PartialEq)]
-pub enum CompactTileState {
+pub enum CompactTile {
     Empty,
-    Green(char),    // TODO: green -> correct
-    Yellow(char),   // TODO: yellow -> present
+    Correct(char),
+    Yellow(char),
     /// SPEC 1.3: brown tile means that a letter would appear in more yellow tiles than is possible
-    Brown(char),    // TODO: brown -> absent
+    Brown(char),
     /// many yellow or brown letters in this cell; bool = is_brown
-    Yellows(HashSet<char>, HashSet<char>) // yellows, browns
+    Multi(HashSet<char>, HashSet<char>) // yellows, browns
 }
 
 /// SPEC 1.1: Compact one-row summary for a word
@@ -30,24 +30,21 @@ pub enum CompactTileState {
 /// Greens at correct positions; yellows shown where they appeared.
 /// SPEC 1.2: yellows displaced by greens go to an extra cell if there are no other yellow tiles for that letter.
 /// SPEC 1.3: A brown tile means that letter is NOT in that tile, so it's same as yellow except maybe it's not elsewhere either.
-pub fn compact_row(
-    guesses: &[Vec<(char, TileState)>],
-) -> (Vec<CompactTileState>, Vec<char>) {
-
+pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec<char>) {
     // avoid taking word_length as argument because it can be simply inferred from guesses
     assert!(!guesses.is_empty(), "compact_row: can't be called with no guesses");
     let word_length = guesses[0].len();
     assert!(guesses.iter().all(|r| r.len() == word_length), "compact_row: all guesses must be the same length");
 
-    // find out solved positions first (green), because they exclude other letters in that position
-    let mut green_at: Vec<Option<char>> = vec![None; word_length];
+    // find out solved positions (green) first, because they exclude other letters in that position
+    let mut correct_at: Vec<Option<char>> = vec![None; word_length];
     let mut seen_count_of: HashMap<char, CharacterCount> = HashMap::new();
     for row in guesses.iter() {
         let mut seen_as_absent: HashSet<char> = HashSet::new();
         let mut current_guess_count_of: HashMap<char, usize> = HashMap::new();
         for (i, &(c, state)) in row.iter().enumerate() {
             if state == TileState::Correct {
-                green_at[i] = Some(c);
+                correct_at[i] = Some(c);
             }
             if state == TileState::Correct || state == TileState::Present {
                 *current_guess_count_of.entry(c).or_insert(0) += 1;
@@ -70,13 +67,13 @@ pub fn compact_row(
             }
         }
     }
-    let green_count = green_at.iter().filter(|g| g.is_some()).count();
+    let solved_count = correct_at.iter().filter(|g| g.is_some()).count();
 
     // collect tested letters in the remaining non-solved positions
     let mut is_wrong: HashMap<char, Vec<bool>> = HashMap::new();
     for row in guesses.iter() {
         for (i, &(c, state)) in row.iter().enumerate() {
-            if green_at[i].is_some() { continue; }
+            if correct_at[i].is_some() { continue; }
             if state == TileState::Present || state == TileState::Absent {
                 is_wrong.entry(c).or_insert(vec![false; word_length])[i] = true;
             }
@@ -88,7 +85,7 @@ pub fn compact_row(
     let mut browns_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
     let mut extras = Vec::new();
     for (&c, &n_seen) in seen_count_of.iter() {
-        let correct_count = green_at.iter().filter(|g| **g == Some(c)).count();
+        let correct_count = correct_at.iter().filter(|g| **g == Some(c)).count();
         if let CharacterCount::Exactly(n_exact) = n_seen {
             assert!(correct_count <= n_exact, "there can't be more greens than exact count");
             // if greens already account for all occurrences of the letter, no yellows/browns needed
@@ -100,7 +97,7 @@ pub fn compact_row(
         };
         // if there's no more unknown cells to try, no yellows/browns needed
         //   not even extra, because the point of extra is still to be able to place it on an unknown tile
-        if green_count + tried_wrong_count == word_length { continue; }
+        if solved_count + tried_wrong_count == word_length { continue; }
 
         // allocate the yellows to tried&wrong cells first, then extra cell; leftover tried cells become brown
         let seen_count = match n_seen {
@@ -127,17 +124,17 @@ pub fn compact_row(
         }
     }
 
-    let result_row: Vec<CompactTileState> = (0..word_length).map(|i| {
-        if let Some(c) = green_at[i] {
-            CompactTileState::Green(c)
+    let result_row: Vec<CompactTile> = (0..word_length).map(|i| {
+        if let Some(c) = correct_at[i] {
+            CompactTile::Correct(c)
         } else if yellows_at[i].is_empty() && browns_at[i].is_empty() {
-            CompactTileState::Empty
+            CompactTile::Empty
         } else if yellows_at[i].len() == 1 && browns_at[i].is_empty() {
-            CompactTileState::Yellow(*yellows_at[i].iter().next().unwrap())
+            CompactTile::Yellow(*yellows_at[i].iter().next().unwrap())
         } else if yellows_at[i].is_empty() && browns_at[i].len() == 1 {
-            CompactTileState::Brown(*browns_at[i].iter().next().unwrap())
+            CompactTile::Brown(*browns_at[i].iter().next().unwrap())
         } else {
-            CompactTileState::Yellows(yellows_at[i].clone(), browns_at[i].clone())
+            CompactTile::Multi(yellows_at[i].clone(), browns_at[i].clone())
         }
     }).collect();
 
@@ -263,17 +260,17 @@ impl Monuli {
         let n = cells.len();
         for (pos, cell) in cells.iter().enumerate() {
             match cell {
-                CompactTileState::Green(_) => {
+                CompactTile::Correct(_) => {
                     green_count += 1;
                     green_pos_metric += 1 << (n - 1 - pos);
                 }
-                CompactTileState::Yellow(_) => yellow_count += 1,
-                CompactTileState::Brown(_) => brown_count += 1,
-                CompactTileState::Yellows(ys, bs) => {
+                CompactTile::Yellow(_) => yellow_count += 1,
+                CompactTile::Brown(_) => brown_count += 1,
+                CompactTile::Multi(ys, bs) => {
                     yellow_count += ys.len();
                     brown_count += bs.len();
                 }
-                CompactTileState::Empty => {}
+                CompactTile::Empty => {}
             }
         }
         yellow_count += extra.len();
@@ -306,7 +303,7 @@ impl Monuli {
     }
 
     /// Compact row for one word (for monuli list view). SPEC 1.1 + 1.2.
-    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactTileState>, Vec<char>) {
+    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactTile>, Vec<char>) {
         match self.words.get(word_index) {
             Some(w) => {
                 let up_to = w.solved_at.map(|s| s + 1).unwrap_or(self.current_guess);
@@ -318,11 +315,11 @@ impl Monuli {
                     .cloned()
                     .collect();
                 if submitted.is_empty() {
-                    return (vec![CompactTileState::Empty; self.word_length], vec![]);
+                    return (vec![CompactTile::Empty; self.word_length], vec![]);
                 }
                 compact_row(&submitted)
             }
-            None => (vec![CompactTileState::Empty; self.word_length], vec![]),
+            None => (vec![CompactTile::Empty; self.word_length], vec![]),
         }
     }
 
@@ -921,7 +918,7 @@ mod tests {
         }
     }
 
-    fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactTileState], expected_extra: &[char]) {
+    fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactTile], expected_extra: &[char]) {
         let w: Vec<char> = word.chars().collect();
         let max = guesses.len();
         let mut states = vec![HashMap::new(); max];
@@ -938,11 +935,11 @@ mod tests {
         assert_eq!(extra, expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
     }
 
-    fn g(c: char) -> CompactTileState { CompactTileState::Green(c) }
-    fn y(c: char) -> CompactTileState { CompactTileState::Yellow(c) }
-    fn b(c: char) -> CompactTileState { CompactTileState::Brown(c) }
-    fn m(ys: &[char], bs: &[char]) -> CompactTileState { CompactTileState::Yellows(ys.iter().cloned().collect(), bs.iter().cloned().collect()) }
-    const E: CompactTileState = CompactTileState::Empty;
+    fn g(c: char) -> CompactTile { CompactTile::Correct(c) }
+    fn y(c: char) -> CompactTile { CompactTile::Yellow(c) }
+    fn b(c: char) -> CompactTile { CompactTile::Brown(c) }
+    fn m(ys: &[char], bs: &[char]) -> CompactTile { CompactTile::Multi(ys.iter().cloned().collect(), bs.iter().cloned().collect()) }
+    const E: CompactTile = CompactTile::Empty;
 
     #[test]
     fn compact_row_cases() {
