@@ -40,7 +40,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Full, word_length))
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(chars.collect());
     }
 
@@ -50,7 +50,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Easy, word_length))
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(chars.collect());
     }
 
@@ -62,13 +62,13 @@ fn parse_all_words() -> Rc<WordLists> {
             // TODO: Fake 6-letter easy words from common words, get rid of this if the list is created
             word_lists
                 .entry((WordList::Easy, 6))
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(chars.clone().collect());
         }
 
         word_lists
             .entry((WordList::Common, word_length))
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(chars.collect());
     }
 
@@ -77,7 +77,7 @@ fn parse_all_words() -> Rc<WordLists> {
         let word_length = chars.clone().count();
         word_lists
             .entry((WordList::Profanities, word_length))
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(chars.collect());
     }
 
@@ -85,22 +85,21 @@ fn parse_all_words() -> Rc<WordLists> {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum WordList {
     Full,
+    #[default]
     Common,
     Easy,
     Profanities,
     Daily,
 }
 
-impl Default for WordList {
-    fn default() -> Self {
-        WordList::Common
-    }
-}
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum GameMode {
+    #[default]
     Classic,
     Relay,
     DailyWord(NaiveDate),
@@ -108,23 +107,15 @@ pub enum GameMode {
     Quadruple,
 }
 
-impl Default for GameMode {
-    fn default() -> Self {
-        GameMode::Classic
-    }
-}
 
 #[derive(PartialEq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Theme {
+    #[default]
     Dark,
     Colorblind,
 }
 
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::Dark
-    }
-}
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub enum CharacterState {
@@ -341,7 +332,7 @@ impl Manager {
             }
         }
 
-        return None;
+        None
     }
 
     pub fn push_character(&mut self, character: char) {

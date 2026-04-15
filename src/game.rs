@@ -161,7 +161,7 @@ pub fn board_tile_state(
 ) -> TileState {
     match states[current_guess].get(&(*character, index)) {
         Some(CharacterState::Correct) => {
-            return TileState::Correct;
+            TileState::Correct
         }
         Some(CharacterState::Absent) => {
             let revealed = revealed_counts
@@ -176,15 +176,15 @@ pub fn board_tile_state(
             match discovered_count {
                 CharacterCount::AtLeast(count) | CharacterCount::Exactly(count) => {
                     if *revealed <= *count {
-                        return TileState::Present;
+                        TileState::Present
                     } else {
-                        return TileState::Absent;
+                        TileState::Absent
                     }
                 }
             }
         }
         _ => {
-            return TileState::Unknown;
+            TileState::Unknown
         }
     }
 }
