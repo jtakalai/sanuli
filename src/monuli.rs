@@ -655,7 +655,13 @@ impl Game for Monuli {
                         vec![]
                     }
                 } else {
-                    vec![] // submit guess is handled via Msg::Enter in main.rs:update
+                    if self.is_guessing() {
+                        // submit guess is handled via Msg::Enter in main.rs:update
+                        vec![]
+                    } else {
+                        // Restart with new words
+                        vec![Msg::NextWord]
+                    }
                 }
             }
             ControlKey::ArrowLeft => {
