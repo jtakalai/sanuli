@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use yew::prelude::*;
 use crate::Msg;
 use crate::monuli::{Monuli, CompactTile};
@@ -100,11 +101,11 @@ pub fn monuli_view(props: &Props) -> Html {
                                 CompactTile::Multi(ps, mps, aas) => html! {
                                     <div class="compact-cell compact-cell-multi">
                                         {
-                                            ps.iter().map(|&c| html! {
+                                            ps.iter().sorted().map(|&c| html! {
                                                 <span class="present">{ c }</span>
-                                            }).chain(mps.iter().map(|&c| html! {
+                                            }).chain(mps.iter().sorted().map(|&c| html! {
                                                 <span class="maybe-present">{ c }</span>
-                                            })).chain(aas.iter().map(|&c| html! {
+                                            })).chain(aas.iter().sorted().map(|&c| html! {
                                                 <span class="absent">{ c }</span>
                                             })).collect::<Html>()
                                         }
@@ -130,17 +131,17 @@ pub fn monuli_view(props: &Props) -> Html {
                                         { compact.iter().map(&render_cell).collect::<Html>() }
                                     </div>
                                     <div class="compact-cells-side">
-                                        { if extras.is_empty() {
+                                        { if extras.len() == 0 {
                                             html! {}
                                         } else if extras.len() == 1 {
-                                            let c = extras[0];
+                                            let c = extras.iter().next().unwrap();
                                             html! {
                                                 <div class="compact-cell present">{ c }</div>
                                             }
                                         } else {
                                             html! {
                                                 <div class="compact-cell compact-cell-multi">
-                                                    { extras.iter().map(|&c| html! {
+                                                    { extras.iter().sorted().map(|&c| html! {
                                                         <span class="present">{ c }</span>
                                                     }).collect::<Html>()
                                                     }

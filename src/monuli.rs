@@ -44,7 +44,7 @@ pub enum CompactTile {
 /// Greens at correct positions; yellows shown where they appeared.
 /// SPEC 1.2: yellows displaced by greens go to an extra cell if there are no other yellow tiles for that letter.
 /// SPEC 1.3: A brown tile means that letter is NOT in that tile, so it's same as yellow except maybe it's not elsewhere either.
-pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec<char>) {
+pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, HashSet<char>) {
     // avoid taking word_length as argument because it can be simply inferred from guesses
     assert!(!guesses.is_empty(), "compact_row: can't be called with no guesses");
     let word_length = guesses[0].len();
@@ -98,7 +98,7 @@ pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec
     let mut yellows_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
     let mut browns_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
     let mut absent_at: Vec<HashSet<char>> = vec![HashSet::new(); word_length];
-    let mut extras = Vec::new();
+    let mut extras = HashSet::new();
     for (&c, &n_seen) in seen_count_of.iter() {
         let correct_count = correct_at.iter().filter(|g| **g == Some(c)).count();
         if let CharacterCount::Exactly(n_exact) = n_seen {
@@ -134,7 +134,7 @@ pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec
             }
         }
         while yellows_left > 0 {
-            extras.push(c);
+            extras.insert(c);
             yellows_left -= 1;
         }
     }
@@ -155,7 +155,6 @@ pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec
         }
     }).collect();
 
-    extras.sort();
     (result_row, extras)
 }
 
@@ -214,6 +213,7 @@ pub struct Monuli {
     words: Vec<MonuliWordState>,
     current_guess: usize,
     streak: usize,
+    best_score: usize,
     message: String,
 
     #[serde(skip)]
@@ -326,7 +326,7 @@ impl Monuli {
     }
 
     /// Compact row for one word (for monuli list view). SPEC 1.1 + 1.2.
-    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactTile>, Vec<char>) {
+    pub fn compact_row(&self, word_index: usize) -> (Vec<CompactTile>, HashSet<char>) {
         match self.words.get(word_index) {
             Some(w) => {
                 let up_to = w.solved_at.map(|s| s + 1).unwrap_or(self.current_guess);
@@ -338,11 +338,11 @@ impl Monuli {
                     .cloned()
                     .collect();
                 if submitted.is_empty() {
-                    return (vec![CompactTile::Empty; self.word_length], vec![]);
+                    return (vec![CompactTile::Empty; self.word_length], HashSet::new());
                 }
                 compact_row(&submitted)
             }
-            None => (vec![CompactTile::Empty; self.word_length], vec![]),
+            None => (vec![CompactTile::Empty; self.word_length], HashSet::new()),
         }
     }
 
@@ -448,6 +448,7 @@ impl Monuli {
             words: words_state,
             current_guess: 0,
             streak: 0,
+            best_score: 0,
             message: String::new(),
             allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             word_lists,
@@ -571,8 +572,8 @@ impl Game for Monuli {
         self.allow_profanities = is_allowed;
     }
     fn title(&self) -> String {
-        if self.streak > 0 {
-            format!("{}:n monuli ({}/{}) — Putki: {}", self.n_words, self.current_guess + 1, self.max_guesses(), self.streak)
+        if self.best_score > 0 {
+            format!("{}:n monuli ({}/{}) — Paras: {}", self.n_words, self.current_guess + 1, self.max_guesses(), self.best_score)
         } else {
             format!("{}:n monuli ({}/{})", self.n_words, self.current_guess + 1, self.max_guesses())
         }
@@ -805,6 +806,9 @@ impl Game for Monuli {
             self.set_game_end_message();
             if self.is_winner() {
                 self.streak += 1;
+                if self.best_score == 0 || self.current_guess < self.best_score {
+                    self.best_score = self.current_guess;
+                }
             } else {
                 self.streak = 0;
             }
@@ -912,6 +916,8 @@ impl Game for Monuli {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
+
     use super::*;
 
     fn make_test_monuli(words: &[&str]) -> Monuli {
@@ -994,7 +1000,7 @@ mod tests {
         }
         let (result, extra) = compact_row(&rows);
         assert_eq!(result, expected, "word={word}, guesses={guesses:?}");
-        assert_eq!(extra, expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
+        assert_eq!(extra.into_iter().sorted().collect::<Vec<_>>(), expected_extra, "word={word}, guesses={guesses:?} (extra cell)");
     }
 
     fn g(c: char) -> CompactTile { CompactTile::Correct(c) }
