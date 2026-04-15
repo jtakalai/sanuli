@@ -155,6 +155,7 @@ pub fn compact_row(guesses: &[Vec<(char, TileState)>]) -> (Vec<CompactTile>, Vec
         }
     }).collect();
 
+    extras.sort();
     (result_row, extras)
 }
 
@@ -190,7 +191,9 @@ fn get_random_word_excluding(
 pub struct MonuliWordState {
     pub word: Vec<char>,
     pub guesses: Vec<Vec<(char, TileState)>>,
+    #[serde(skip)]
     pub known_states: Vec<KnownStates>,
+    #[serde(skip)]
     pub known_counts: Vec<KnownCounts>,
     /// Guess index at which this word was solved (None if unsolved).
     pub solved_at: Option<usize>,
@@ -752,7 +755,7 @@ impl Game for Monuli {
         let guess_letters: Vec<char> = self.current_guess_letters();
 
         // When in sanuli view, only the selected word has the current row; copy it to all unsolved words for evaluation.
-        if let Some(src) = self.selected_word_index.filter(|&i| i < self.words.len()) {
+        if let Some(src) = self.selected_word_index.filter(|&i| i < self.words.len() && !self.word_is_solved(i)) {
             let row = self.words[src].guesses[self.current_guess].clone();
             for w in self.words.iter_mut() {
                 if w.is_solved() {
@@ -918,13 +921,17 @@ impl Game for Monuli {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        let game_key = format!(
-            "game|{}|{}|{}",
-            serde_json::to_string(&GameMode::Monuli(self.n_words)).unwrap(),
-            serde_json::to_string(&self.word_list).unwrap(),
-            self.word_length
-        );
-        LocalStorage::set(&game_key, self)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let game_key = format!(
+                "game|{}|{}|{}",
+                serde_json::to_string(&GameMode::Monuli(self.n_words)).unwrap(),
+                serde_json::to_string(&self.word_list).unwrap(),
+                self.word_length
+            );
+            LocalStorage::set(&game_key, self)?;
+        }
+        Ok(())
     }
 }
 
@@ -1039,7 +1046,7 @@ mod tests {
         // SPEC 1.3: I appears 2x as yellow but max 1 per guess → brown
         test_compact_row("LEIPÄ", &["PILLI", "LAPSI"], &[g('L'), y('I'), y('P'), E, h('I')], &[]);
         // SPEC 1.2: displaced yellows go to extra cell
-        test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"], &[g('M'), g('Ä'), b('M'), E, E], &['Ä', 'R']);
+        test_compact_row("MÄÄRÄ", &["ÄÄLIÖ", "RAMPA", "MÖKKI"], &[g('M'), g('Ä'), b('M'), E, E], &['R', 'Ä']);
         // SPEC 1.1.1: two yellows in same cell
         test_compact_row("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, m(&['L', 'H'], &[], &[]), g('I')], &[]);
         // one green, four yellow
@@ -1048,5 +1055,27 @@ mod tests {
         test_compact_row("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')], &[]);
         // all green
         test_compact_row("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')], &[]);
+    }
+
+    #[test]
+    fn test_serialization() {
+        let words = ["LAHTI", "HANHI"];
+        let mut m = make_test_monuli(&words);
+        type_and_submit(&mut m, "KAKKU");
+
+        let serialized = serde_json::to_string(&m).expect("Serialization failed");
+        let mut deserialized: Monuli = serde_json::from_str(&serialized).expect("Deserialization failed");
+
+        // Re-inject word lists as they are skipped
+        deserialized.word_lists = m.word_lists.clone();
+        deserialized.refresh();
+
+        assert_eq!(deserialized.n_words, m.n_words);
+        assert_eq!(deserialized.current_guess, m.current_guess);
+        assert_eq!(deserialized.words[0].word, m.words[0].word);
+        assert_eq!(deserialized.words[0].guesses, m.words[0].guesses);
+
+        // known_states should be rebuilt by refresh()
+        assert_eq!(deserialized.words[0].known_states, m.words[0].known_states);
     }
 }

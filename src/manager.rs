@@ -151,7 +151,7 @@ impl Default for Theme {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum CharacterState {
     Correct,
     Absent,
