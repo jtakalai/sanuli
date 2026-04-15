@@ -232,9 +232,6 @@ impl Component for App {
 
             let boards = game.boards();
 
-            let show_monuli_back = matches!(game.game_mode(), GameMode::Monuli(_))
-                && game.monuli_selected_word().is_some();
-
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
                     <Header
@@ -249,19 +246,30 @@ impl Component for App {
                                 if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
                                     if let Some(word_idx) = monuli.selected_word_index {
                                         if let Some(board) = game.board_for_word(word_idx) {
+                                            let onback = link.callback(move |e: MouseEvent| {
+                                                e.prevent_default();
+                                                Msg::SelectMonuliWord(None)
+                                            });
                                             html! {
-                                                <div class="board-container">
-                                                    <Board
-                                                        guesses={board.guesses}
-                                                        is_guessing={board.is_guessing}
-                                                        current_guess={board.current_guess}
-                                                        is_reset={false}
-                                                        is_hidden={false}
-                                                        previous_guesses={vec![]}
-                                                        max_guesses={game.max_guesses()}
-                                                        word_length={game.word_length()}
-                                                    />
-                                                </div>
+                                                <>
+                                                    <div class="monuli-back-bar">
+                                                        <button class="monuli-back-button" onmousedown={onback}>
+                                                            {"← TAKAISIN"}
+                                                        </button>
+                                                    </div>
+                                                    <div class="board-container">
+                                                        <Board
+                                                            guesses={board.guesses}
+                                                            is_guessing={board.is_guessing}
+                                                            current_guess={board.current_guess}
+                                                            is_reset={false}
+                                                            is_hidden={false}
+                                                            previous_guesses={vec![]}
+                                                            max_guesses={game.max_guesses()}
+                                                            word_length={game.word_length()}
+                                                        />
+                                                    </div>
+                                                </>
                                             }
                                         } else {
                                             html! {}
@@ -377,7 +385,6 @@ impl Component for App {
                         is_emojis_copied={self.is_emojis_copied}
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
-                        show_monuli_back={show_monuli_back}
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}
                         last_guess={last_guess}

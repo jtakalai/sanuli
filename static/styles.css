@@ -233,6 +233,22 @@ header {
     width: 1.6rem;
 }
 
+.board-11 {
+    position: absolute;
+    display: grid;
+    grid-template-rows: repeat(11, 1fr);
+    width: 220px;
+    height: 450px;
+    grid-gap: 4px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.board-11 .tile {
+    font-size: 1.1rem;
+    line-height: 1.1rem;
+}
+
 .keyboard {
     z-index: 2;
     display: flex;
@@ -481,6 +497,14 @@ header {
         width: 275px;
         height: 330px;
     }
+    .board-11 {
+        width: 180px;
+        height: 370px;
+    }
+    .board-11 .tile {
+        font-size: 0.9rem;
+        line-height: 0.9rem;
+    }
     .keyboard-button {
         margin-right: 4px;
     }
@@ -617,21 +641,61 @@ header {
     text-decoration: none;
 }
 
+/* Monuli sanuli (single-word) view */
+.monuli-back-bar {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    padding: 2px 8px;
+    box-sizing: border-box;
+}
+
+.monuli-back-button {
+    background: var(--unknown);
+    border: none;
+    color: var(--white);
+    font-weight: bold;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.monuli-back-button:hover {
+    background: var(--absent);
+}
+
 /* Monuli list view */
 .monuli-list-view {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
     padding: 8px 0;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.monuli-list-view > .row-5,
+.monuli-list-view > .row-6 {
+    display: flex;
+    gap: 5px;
+}
+
+.monuli-list-view .tile {
+    width: 42px;
+    height: 42px;
+    font-size: 1.2rem;
+    line-height: 1.2rem;
 }
 
 .monuli-word-list {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
     max-height: 40vh;
     overflow-y: auto;
+    scrollbar-gutter: stable both-edges;
     width: 100%;
     align-items: center;
 }
@@ -640,20 +704,19 @@ header {
     height: 4px;
     background: var(--absent);
     width: 100%;
-    max-width: 280px;
-    margin: 4px 0;
+    max-width: 230px;
+    margin: 2px 0;
 }
 
 .monuli-compact-row {
     display: flex;
-    gap: 2px;
+    gap: 5px;
     cursor: pointer;
-    padding: 2px 0;
+    padding: 0;
 }
 
 .monuli-compact-row:hover {
     background-color: var(--unknown);
-    border-radius: 4px;
 }
 
 .compact-cell {
@@ -664,22 +727,25 @@ header {
     justify-content: center;
     font-weight: bold;
     font-size: 1.2rem;
-    border-radius: 4px;
     text-transform: uppercase;
+    color: var(--white);
+    background-color: var(--background);
+    border: 2px solid #3a3a3c;
+    box-sizing: border-box;
 }
 
 .compact-cell-empty {
-    background-color: var(--absent);
+    background-color: var(--background);
 }
 
 .compact-cell-green {
     background-color: var(--correct);
-    color: var(--white);
+    border: none;
 }
 
 .compact-cell-yellow {
     background-color: var(--present);
-    color: var(--white);
+    border: none;
 }
 
 .compact-cell-yellows {
@@ -688,7 +754,8 @@ header {
     grid-template-rows: 1fr 1fr;
     gap: 1px;
     padding: 2px;
-    background-color: var(--absent);
+    background-color: var(--background);
+    border: 2px solid #3a3a3c;
     font-size: 0.65rem;
 }
 
@@ -699,4 +766,5 @@ header {
     display: flex;
     align-items: center;
     justify-content: center;
+    border: none;
 }

@@ -46,6 +46,7 @@ Kukin sana on vain yksi rivi, joka koostaa aiempien arvausten osumat
 	- tällöin viiden vihreän sanat, joita kuitenkaan ei ole arvattu, näkyvät monulilistan kärjessä, kun taas arvatut sanat ovat viimeisen ei-täysin-vihreän sanan jälkeen
 - lisäratkaisu: rendataan erotin (esim. täysin musta rivi) ennen ratkaistujen osiota
 	- monulilistasta tulee tällöin N+erotin pituinen, ei haittaa
+	- erottimessa lukee "Ratkaistut sanat:"
 
 Jos sanoja on enemmän kuin ruudulle mahtuu luettavana, näytetään ensin "kokonaisnäkymä" eli sanat puristetaan vielä pienemmiksi ja kirjaimia ei piirretä vaan pelkät värit.
 - puristetut sanat menevät monelle palstalle

@@ -52,11 +52,13 @@ pub enum CompactCell {
 
 /// Compact one-row summary for a word (SPEC 1.1). Greens at correct positions; yellows
 /// per position (which wrong-position letter landed in which cell). Same cell can have
-/// multiple yellows from different guesses.
+/// multiple yellows from different guesses. Yellows for a letter are suppressed when
+/// greens already account for all occurrences of that letter in the word.
 pub fn compact_row(
-    word_length: usize,
+    word: &[char],
     guesses: &[Vec<(char, TileState)>],
 ) -> Vec<CompactCell> {
+    let word_length = word.len();
     let mut green_at: Vec<Option<char>> = vec![None; word_length];
     let mut yellow_at: Vec<Vec<char>> = (0..word_length).map(|_| Vec::new()).collect();
     for row in guesses.iter() {
@@ -66,11 +68,34 @@ pub fn compact_row(
         for (i, &(c, state)) in row.iter().enumerate() {
             match state {
                 TileState::Correct => green_at[i] = Some(c),
-                TileState::Present => yellow_at[i].push(c),
+                TileState::Present => {
+                    if !yellow_at[i].contains(&c) {
+                        yellow_at[i].push(c);
+                    }
+                }
                 _ => {}
             }
         }
     }
+
+    // Suppress yellows for letters already fully accounted for by greens.
+    // Track how many yellows we've kept per letter so far (left-to-right).
+    let mut yellow_used: HashMap<char, usize> = HashMap::new();
+    for i in 0..word_length {
+        let green_count = |c: char| green_at.iter().filter(|g| **g == Some(c)).count();
+        let word_count = |c: char| word.iter().filter(|&&ch| ch == c).count();
+        yellow_at[i].retain(|&c| {
+            let budget = word_count(c).saturating_sub(green_count(c));
+            let used = yellow_used.get(&c).copied().unwrap_or(0);
+            if used < budget {
+                *yellow_used.entry(c).or_insert(0) += 1;
+                true
+            } else {
+                false
+            }
+        });
+    }
+
     (0..word_length)
         .map(|i| {
             if let Some(c) = green_at[i] {
@@ -195,7 +220,7 @@ impl Monuli {
                     .filter(|row| row.len() == self.word_length)
                     .cloned()
                     .collect();
-                compact_row(self.word_length, &submitted)
+                compact_row(&w.word, &submitted)
             }
             None => vec![CompactCell::Empty; self.word_length],
         }
@@ -514,10 +539,8 @@ impl Game for Monuli {
     }
     fn board_for_word(&self, word_index: usize) -> Option<Board> {
         let w = self.words.get(word_index)?;
-        let guesses = w.guesses[..=self.current_guess.min(w.guesses.len().saturating_sub(1))]
-            .to_vec();
         Some(Board {
-            guesses,
+            guesses: w.guesses.clone(),
             current_guess: self.current_guess,
             is_guessing: self.is_guessing(),
         })
@@ -693,108 +716,41 @@ impl Game for Monuli {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game::Game;
-    use std::collections::HashSet;
 
-    // if you add need more/new words in the tests, add them here first!
-    const WORDS: &[&str] = &["LAHTI", "KAALI", "TARHA", "HANHI", "HIHNA"];
-
-    fn test_word_lists() -> Rc<WordLists> {
-        let set: HashSet<Vec<char>> = WORDS.iter().map(|s| s.chars().collect()).collect();
-        let mut map = HashMap::new();
-        map.insert((WordList::Full, 5), set);
-        Rc::new(map)
+    fn check(word: &str, guesses: &[&str], expected: &[CompactCell]) {
+        let w: Vec<char> = word.chars().collect();
+        let max = guesses.len();
+        let mut states = vec![HashMap::new(); max];
+        let mut counts = vec![HashMap::new(); max];
+        let mut rows: Vec<Vec<(char, TileState)>> = guesses
+            .iter()
+            .map(|s| s.chars().map(|c| (c, TileState::Unknown)).collect())
+            .collect();
+        for (i, row) in rows.iter_mut().enumerate() {
+            game::update_known_information(&mut states, &mut counts, row, i, &w, max);
+        }
+        let result = compact_row(&w, &rows);
+        assert_eq!(result, expected, "word={word}, guesses={guesses:?}");
     }
 
-    /// SPEC 1.1 example 1.1.1: word LAHTI, guess 1 KAALI (L wrong at pos 3), guess 2 TARHA (H wrong at pos 3).
-    /// After two guesses: yellow T, green A, empty, 2×2 [L, H], green I.
-    #[test]
-    fn compact_row_example_1_1_1() {
-        let word_lists = test_word_lists();
-        let mut monuli = Monuli::new_with_words(
-            5,
-            vec!["LAHTI".chars().collect()],
-            WordList::Full,
-            word_lists,
-        );
-        for c in "KAALI".chars() {
-            monuli.push_character(c);
-        }
-        monuli.submit_guess();
-        for c in "TARHA".chars() {
-            monuli.push_character(c);
-        }
-        monuli.submit_guess();
-        let out = monuli.compact_row(0);
-        assert_eq!(out.len(), 5);
-        assert_eq!(out[0], CompactCell::YellowOne('T'));
-        assert_eq!(out[1], CompactCell::Green('A'));
-        assert_eq!(out[2], CompactCell::Empty);
-        assert_eq!(out[3], CompactCell::Yellows(vec!['L', 'H']));
-        assert_eq!(out[4], CompactCell::Green('I'));
-    }
+    fn g(c: char) -> CompactCell { CompactCell::Green(c) }
+    fn y(c: char) -> CompactCell { CompactCell::YellowOne(c) }
+    fn ys(cs: &[char]) -> CompactCell { CompactCell::Yellows(cs.to_vec()) }
+    const E: CompactCell = CompactCell::Empty;
 
     #[test]
-    fn compact_row_all_green() {
-        let word_lists = test_word_lists();
-        let mut monuli = Monuli::new_with_words(
-            5,
-            vec!["LAHTI".chars().collect()],
-            WordList::Full,
-            word_lists,
-        );
-        // First guess wrong so the first-guess rule doesn't replace the word; second guess correct.
-        for c in "KAALI".chars() {
-            monuli.push_character(c);
-        }
-        monuli.submit_guess();
-        for c in "LAHTI".chars() {
-            monuli.push_character(c);
-        }
-        monuli.submit_guess();
-        let out = monuli.compact_row(0);
-        assert_eq!(out[0], CompactCell::Green('L'));
-        assert_eq!(out[1], CompactCell::Green('A'));
-        assert_eq!(out[2], CompactCell::Green('H'));
-        assert_eq!(out[3], CompactCell::Green('T'));
-        assert_eq!(out[4], CompactCell::Green('I'));
-    }
-
-    #[test]
-    fn compact_row_one_green_four_yellow() {
-        // Word HANHI. Guess HIHNA -> H correct, I present, H present, N present, A present.
-        let word_lists = test_word_lists();
-        let mut monuli = Monuli::new_with_words(
-            5,
-            vec!["HANHI".chars().collect()],
-            WordList::Full,
-            word_lists,
-        );
-        for c in "HIHNA".chars() {
-            monuli.push_character(c);
-        }
-        monuli.submit_guess();
-        let out = monuli.compact_row(0);
-        assert_eq!(out[0], CompactCell::Green('H'));
-        assert_eq!(out[1], CompactCell::YellowOne('I'));
-        assert_eq!(out[2], CompactCell::YellowOne('H'));
-        assert_eq!(out[3], CompactCell::YellowOne('N'));
-        assert_eq!(out[4], CompactCell::YellowOne('A'));
-    }
-
-    #[test]
-    fn compact_row_empty() {
-        let word_lists = test_word_lists();
-        let monuli = Monuli::new_with_words(
-            5,
-            vec!["LAHTI".chars().collect()],
-            WordList::Full,
-            word_lists,
-        );
-        let out = monuli.compact_row(0);
-        assert_eq!(out.len(), 5);
-        for i in 0..5 {
-            assert_eq!(out[i], CompactCell::Empty);
-        }
+    fn compact_row_cases() {
+        // no guesses
+        check("LAHTI", &[], &[E, E, E, E, E]);
+        // all green
+        check("LAHTI", &["KAALI", "LAHTI"], &[g('L'), g('A'), g('H'), g('T'), g('I')]);
+        // SPEC 1.1.1: two yellows in same cell
+        check("LAHTI", &["KAALI", "TARHA"], &[y('T'), g('A'), E, ys(&['L', 'H']), g('I')]);
+        // one green, four yellow
+        check("HANHI", &["HIHNA"], &[g('H'), y('I'), y('H'), y('N'), y('A')]);
+        // duplicate yellow in same position deduped
+        check("LAHTI", &["KAALI", "MAALI"], &[E, g('A'), E, y('L'), g('I')]);
+        // yellow suppressed when letter already green
+        check("HURJA", &["HIENO", "KAUHA", "HUHTA"], &[g('H'), g('U'), E, E, g('A')]);
     }
 }
