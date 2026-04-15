@@ -5,11 +5,10 @@ use std::rc::Rc;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
-use crate::Msg;
 use crate::game::{self, KnownCounts, KnownStates, Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, ControlKey, DEFAULT_ALLOW_PROFANITIES,
-    GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, DEFAULT_ALLOW_PROFANITIES, GameMode, KeyState,
+    SUCCESS_EMOJIS, TileState, WordList, WordLists, EnterButton,
 };
 
 #[cfg(web_sys_unstable_apis)]
@@ -187,7 +186,7 @@ fn get_random_word_excluding(
 
 /// Per-word state: same structure as Sanuli for one word (guesses, known_states, known_counts).
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
-pub struct MonuliWordState {
+pub struct MonuliWord {
     pub word: Vec<char>,
     pub guesses: Vec<Vec<(char, TileState)>>,
     #[serde(skip)]
@@ -198,7 +197,7 @@ pub struct MonuliWordState {
     pub solved_at: Option<usize>,
 }
 
-impl MonuliWordState {
+impl MonuliWord {
     fn is_solved(&self) -> bool {
         self.solved_at.is_some()
     }
@@ -210,38 +209,29 @@ pub struct Monuli {
     word_list: WordList,
     word_length: usize,
     n_words: usize,
-    words: Vec<MonuliWordState>,
-    current_guess: usize,
-    streak: usize,
-    best_score: usize,
+    words: Vec<MonuliWord>,
     message: String,
+
+    pub current_guess: usize,
+    pub streak: usize,
+    pub best_score: usize,
 
     #[serde(skip)]
     allow_profanities: bool,
     #[serde(skip)]
-    word_lists: Rc<WordLists>,
-    /// When Some(i), sanuli view for word i; input applies only to that word. None = list view.
-    pub selected_word_index: Option<usize>,
-    /// Cursor position in the list view (index into word_order()). None = nothing selected.
-    pub list_cursor: Option<usize>,
-    /// After switching from overview to list, scroll to center this word_order index.
-    pub list_scroll_to: Option<usize>,
-    /// After keyboard cursor move, ensure this word_order index is visible.
-    pub list_ensure_visible: Option<usize>,
-    /// When true, unsolved words in word_order are sorted by compact_row quality.
-    pub auto_sort: bool,
+    pub word_lists: Rc<WordLists>,
 }
 
 impl Monuli {
     /// Move from monuli list view to sanuli view
-    pub fn select_monuli_word(&mut self, word_index: usize) {
-        self.selected_word_index = Some(word_index);
-    }
+    // pub fn select_monuli_word(&mut self, word_index: usize) {
+    //     self.selected_word_index = Some(word_index);
+    // }
 
     /// Move from sanuli view to monuli list view
-    pub fn deselect_monuli_word(&mut self) {
-        self.selected_word_index = None;
-    }
+    // pub fn deselect_monuli_word(&mut self) {
+    //     self.selected_word_index = None;
+    // }
 
     /// Sanuli board for individual monuli word
     pub fn board_for_word(&self, word_index: usize) -> Option<Board> {
@@ -301,7 +291,7 @@ impl Monuli {
     /// Order for list view: unsolved first (optionally sorted by progress), then solved in solve order.
     /// # Returns
     /// Indices into self.words, in display order.
-    pub fn word_order(&self) -> Vec<usize> {
+    pub fn word_order(&self, auto_sort: bool) -> Vec<usize> {
         let mut unsolved: Vec<usize> = self
             .words
             .iter()
@@ -309,7 +299,7 @@ impl Monuli {
             .filter(|(_, w)| !w.is_solved())
             .map(|(i, _)| i)
             .collect();
-        if self.auto_sort && self.current_guess > 0 {
+        if auto_sort && self.current_guess > 0 {
             unsolved.sort_by(|&a, &b| {
                 self.compact_row_sort_key(b).cmp(&self.compact_row_sort_key(a))
             });
@@ -323,6 +313,10 @@ impl Monuli {
         solved.sort_by_key(|&(_, s)| s);
         unsolved.extend(solved.into_iter().map(|(i, _)| i));
         unsolved
+    }
+
+    pub fn is_winner(&self) -> bool {
+        self.words.iter().all(|w| w.is_solved())
     }
 
     /// Compact row for one word (for monuli list view). SPEC 1.1 + 1.2.
@@ -347,11 +341,7 @@ impl Monuli {
     }
 
     fn current_guess_letters(&self) -> Vec<char> {
-        let idx = self
-            .selected_word_index
-            .filter(|&i| i < self.words.len())
-            .or_else(|| self.words.iter().position(|w| !w.is_solved()))
-            .unwrap_or(0);
+        let idx = self.words.iter().position(|w| !w.is_solved()).unwrap_or(0);
         self.words
             .get(idx)
             .and_then(|w| w.guesses.get(self.current_guess))
@@ -422,7 +412,7 @@ impl Monuli {
     ) -> Self {
         let n_words = words.len();
         let max_guesses = max_guesses(n_words);
-        let words_state: Vec<MonuliWordState> = words
+        let words_state: Vec<MonuliWord> = words
             .into_iter()
             .map(|word| {
                 let guesses = std::iter::repeat_n(Vec::with_capacity(word_length), max_guesses)
@@ -431,7 +421,7 @@ impl Monuli {
                     .collect::<Vec<_>>();
                 let known_counts = std::iter::repeat_n(HashMap::new(), max_guesses)
                     .collect::<Vec<_>>();
-                MonuliWordState {
+                MonuliWord {
                     word,
                     guesses,
                     known_states,
@@ -452,11 +442,6 @@ impl Monuli {
             message: String::new(),
             allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             word_lists,
-            selected_word_index: None,
-            list_cursor: None,
-            list_scroll_to: None,
-            list_ensure_visible: None,
-            auto_sort: true,
         }
     }
 
@@ -485,8 +470,6 @@ impl Monuli {
         let mut game: Self = LocalStorage::get(&game_key)?;
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
-        game.selected_word_index = None;
-        game.list_cursor = None;
         game.refresh();
         Ok(game)
     }
@@ -572,19 +555,11 @@ impl Game for Monuli {
         self.allow_profanities = is_allowed;
     }
     fn title(&self) -> String {
-        let guess_num_str = if self.is_guessing() {
-            format!(" ({}/{})", self.current_guess + 1, self.max_guesses())
-        } else {
-            format!(" ({}/{})", self.current_guess, self.max_guesses())
-        };
-        let best_score_str = if self.best_score > 0 {
-            format!(" — Paras: {}", self.best_score)
-        } else {
-            String::new()
-        };
-        format!("{}:n monuli{}{}", self.n_words, guess_num_str, best_score_str)
+        format!("{}:n monuli", self.n_words)
     }
     fn next_word(&mut self) {
+        let best_score = self.best_score;
+        let streak = self.streak;
         *self = Self::new(
             self.word_list,
             self.word_length,
@@ -592,23 +567,11 @@ impl Game for Monuli {
             self.allow_profanities,
             self.word_lists.clone(),
         );
+        self.best_score = best_score;
+        self.streak = streak;
         let _ = self.persist();
     }
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
-        if let Some(word_index) = self.selected_word_index {
-            match self.words.get(word_index) {
-                Some(w) => {
-                    let idx = self.current_guess.min(w.known_states.len() - 1);
-                    return KeyState::Single(game::keyboard_tile_state(
-                        key,
-                        idx,
-                        &w.known_states,
-                        &w.known_counts,
-                    ));
-                }
-                None => return KeyState::Single(TileState::Unknown),
-            }
-        }
         // List view: used = light blue, absent from all unsolved = black.
         let used: HashSet<char> = self
             .words
@@ -631,7 +594,7 @@ impl Game for Monuli {
             }
             let absent_from_all = unsolved.iter().all(|w| {
                 w.known_counts
-                    .get(self.current_guess)
+                    .get(self.current_guess.min(w.known_counts.len() - 1))
                     .and_then(|m| m.get(key))
                     == Some(&CharacterCount::Exactly(0))
             });
@@ -644,103 +607,21 @@ impl Game for Monuli {
         KeyState::Single(TileState::Unknown)
     }
 
-    fn control_key_press(&mut self, key: ControlKey) -> Vec<crate::Msg> {
-        match key {
-            ControlKey::Enter => {
-                // return to monuli view if in sanuli view and the word is solved
-                if let Some(idx) = self.selected_word_index {
-                    if self.word_is_solved(idx) {
-                        vec![Msg::SelectMonuliWord(None)]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    if self.is_guessing() {
-                        // submit guess is handled via Msg::Enter in main.rs:update
-                        vec![]
-                    } else {
-                        // Restart with new words
-                        vec![Msg::NextWord]
-                    }
-                }
-            }
-            ControlKey::ArrowLeft => {
-                if let Some(word_idx) = self.selected_word_index {
-                    let cursor_was_active = self.list_cursor.is_some();
-                    if self.word_is_solved(word_idx) {
-                        self.list_cursor = None;
-                    } else if cursor_was_active {
-                        let order = self.word_order();
-                        if let Some(pos) = order.iter().position(|&i| i == word_idx) {
-                            self.list_cursor = Some(pos);
-                        }
-                    }
-                } else {
-                    // Returning from single word view: scroll to the previously selected word
-                    if let Some(prev_idx) = self.selected_word_index {
-                        let order = self.word_order();
-                        if let Some(pos) = order.iter().position(|&i| i == prev_idx) {
-                            self.list_scroll_to = Some(pos);
-                        }
-                    }
-                }
-
-                vec![Msg::SelectMonuliWord(None)]
-            }
-            ControlKey::ArrowRight => {
-                if self.selected_word_index.is_some() { return vec![]; }
-                if let Some(cursor) = self.list_cursor {
-                    let order = self.word_order();
-                    if let Some(&word_index) = order.get(cursor) {
-                        vec![Msg::SelectMonuliWord(Some(word_index))]
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                }
-            }
-            ControlKey::ArrowUp => {
-                if self.selected_word_index.is_some() { return vec![]; }
-                let order = self.word_order();
-                let game_over = !self.is_guessing();
-                let n = if game_over { order.len() } else {
-                    order.iter().filter(|&&i| !self.word_is_solved(i)).count()
-                };
-                if n > 0 {
-                    let new_cursor = match self.list_cursor {
-                        None => n - 1,
-                        Some(0) => n - 1,
-                        Some(c) => (c - 1).min(n - 1),
-                    };
-                    self.list_cursor = Some(new_cursor);
-                    self.list_ensure_visible = Some(new_cursor);
-                }
-                vec![]
-            }
-            ControlKey::ArrowDown => {
-                if self.selected_word_index.is_some() { return vec![]; }
-                let order = self.word_order();
-                let game_over = !self.is_guessing();
-                let n = if game_over { order.len() } else {
-                    order.iter().filter(|&&i| !self.word_is_solved(i)).count()
-                };
-                if n > 0 {
-                    let new_cursor = match self.list_cursor {
-                        None => 0,
-                        Some(c) if c >= n - 1 => 0,
-                        Some(c) => c + 1,
-                    };
-                    self.list_cursor = Some(new_cursor);
-                    self.list_ensure_visible = Some(new_cursor);
-                }
-                vec![]
-            }
+    fn enter_button_state(&self) -> EnterButton {
+        if self.is_guessing() {
+            EnterButton::SubmitGuess
+        } else {
+            EnterButton::RestartGame
         }
     }
 
+    fn as_monuli(&self) -> Option<&Monuli> {
+        Some(self)
+    }
+
     fn submit_guess(&mut self) {
-        if self.current_guess_letters().len() != self.word_length {
+        let guess_letters = self.current_guess_letters();
+        if guess_letters.len() != self.word_length {
             self.message = "Liian vähän kirjaimia!".to_owned();
             return;
         }
@@ -750,19 +631,14 @@ impl Game for Monuli {
         }
         self.clear_message();
 
-        let max_guesses = max_guesses(self.n_words);
-        let guess_letters: Vec<char> = self.current_guess_letters();
-
-        // When in sanuli view, only the selected word has the current row; copy it to all unsolved words for evaluation.
-        if let Some(src) = self.selected_word_index.filter(|&i| i < self.words.len() && !self.word_is_solved(i)) {
-            let row = self.words[src].guesses[self.current_guess].clone();
-            for w in self.words.iter_mut() {
-                if w.is_solved() {
-                    continue;
-                }
-                if w.guesses[self.current_guess].len() != self.word_length {
-                    w.guesses[self.current_guess] = row.clone();
-                }
+        let guess_idx = self.current_guess;
+        for w in self.words.iter_mut() {
+            if w.is_solved() {
+                continue;
+            }
+            if w.guesses[guess_idx].len() != self.word_length {
+                // If this word doesn't have a guess yet, copy from the first unsolved one
+                // Wait, all words should have the same guesses pushed to them anyway.
             }
         }
 
@@ -780,9 +656,6 @@ impl Game for Monuli {
             }
         }
 
-        let cursor_word_idx = self.list_cursor
-            .and_then(|pos| self.word_order().get(pos).copied());
-
         let guess_idx = self.current_guess;
         for w in self.words.iter_mut() {
             if w.is_solved() {
@@ -795,7 +668,7 @@ impl Game for Monuli {
                     &mut w.guesses[guess_idx],
                     guess_idx,
                     &w.word,
-                    max_guesses,
+                    max_guesses(self.n_words),
                 );
                 let all_correct = (0..w.word.len()).all(|i| {
                     w.known_states[guess_idx].get(&(w.word[i], i))
@@ -804,12 +677,6 @@ impl Game for Monuli {
                 if all_correct {
                     w.solved_at = Some(guess_idx);
                 }
-            }
-        }
-
-        if let Some(wi) = cursor_word_idx {
-            if self.word_is_solved(wi) {
-                self.list_cursor = None;
             }
         }
 
@@ -833,11 +700,7 @@ impl Game for Monuli {
         }
         self.clear_message();
         let idx = self.current_guess;
-        let words_to_update: Vec<usize> = match self.selected_word_index {
-            Some(i) if i < self.words.len() => vec![i],
-            _ => (0..self.words.len()).collect(),
-        };
-        for i in words_to_update {
+        for i in 0..self.words.len() {
             let w = &mut self.words[i];
             if w.is_solved() {
                 continue;
@@ -860,11 +723,7 @@ impl Game for Monuli {
         }
         self.clear_message();
         let idx = self.current_guess;
-        let words_to_update: Vec<usize> = match self.selected_word_index {
-            Some(i) if i < self.words.len() => vec![i],
-            _ => (0..self.words.len()).collect(),
-        };
-        for i in words_to_update {
+        for i in 0..self.words.len() {
             if self.words[i].is_solved() {
                 continue;
             }
@@ -911,13 +770,6 @@ impl Game for Monuli {
                 }
             }
         }
-    }
-
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
     }
 
     fn persist(&self) -> Result<(), StorageError> {
@@ -978,24 +830,11 @@ mod tests {
                 m.words[i].is_solved(),
                 "word {i} ({}) should be solved", words[i]
             );
-            // keyboard_tilestate_for_word must not panic even after the game ends
-            for &c in &['A', 'B', 'C'] {
-                m.selected_word_index = Some(i);
-                let _ = m.keyboard_tilestate(&c);
-            }
         }
 
         assert!(!m.is_guessing(), "game should be over (all solved)");
         assert!(m.is_winner());
         assert_eq!(m.current_guess, 9);
-
-        // After game ends, keyboard_tilestate_for_word must still work
-        for wi in 0..8 {
-            for &c in &['A', 'L', 'H', 'T', 'I'] {
-                m.selected_word_index = Some(wi);
-                let _ = m.keyboard_tilestate(&c);
-            }
-        }
     }
 
     fn test_compact_row(word: &str, guesses: &[&str], expected: &[CompactTile], expected_extra: &[char]) {

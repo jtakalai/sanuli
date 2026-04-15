@@ -1,5 +1,11 @@
 # Monuli implementation plan
 
+This plan is now outdated. No need to read further. All that needs to be implemented from it is done.
+
+Overview-view is in a branch `monuli-overview`, but not planned.
+
+## Original document
+
 High-level (from SPEC): N words, N+1 guesses total, first guess guaranteed wrong. New UI: compact one-row-per-word in monuli view; click word → sanuli view for that word. Overview/zoom when many words.
 
 [x] Models and tests (sections 1–2)

@@ -16,6 +16,7 @@ gloo-storage = "0.3.0"
 wasm-logger = "0.2.0"
 log = "0.4.20"
 itertools = "0.12"
+gloo-events = "0.3.0"
 
 [dependencies.serde]
 version = "1.0.215"

@@ -148,6 +148,18 @@ Aiempi idea oli, että jokainen monulin sana pitäisi käydä erikseen ratkaise
 
 Koska monulin ratkoja voi pyrkiä minimaaliseen määrään arvauksia avatakseen kaikki sanat, olisi ehkä järkevämpää seurata parasta tulosta (vähiten yrityksiä) putken sijaan. Monulista voisi toisin sanoen poistaa kaikki max_guesses ja streak -logiikat, mutta voi niiden toisaalta antaa olla niin kauan kuin ne ovat Game-traitissa.
 
+# 1.6: Monulin omat UI-elementit
+
+Monulin vasemmalla puolella on vielä käyttämätöntä tilaa (oikea puoli menee extra-keltaisille)
+
+Sinne mahtuisi mm. seuraavat:
+* "Yritys" "1 / 13": tuo on nyt titlessä, väärä paikka. Parempi että olisi "nappulassa" vasemmalla
+* "Lajittelu": "päällä" (tai pois) voisi olla nappi
+* "Paras" "12": tuokin nyt titlessä, siirretään vasemmalle
+* "Putki" "3": miksipä ei
+
+Nuo siis olisivat kunkin koon monulin omat tilastot, ja tallennettaisi localstorageen koon mukaan.
+
 # 2.0: cleanup sanuli-PR:ää varten
 
 Poistetaan overview cursor, joka aiheutti kamalasti noisea main.rs:ään. Monuli-projektin tavoite on koskea Sanuli-koodiin mahdollisimman vähän. Poistetaan oikeastaan saman tien koko overview, ja työstetään sitä myöhemmin erillisessä branchissa, ehkä.

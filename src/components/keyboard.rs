@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use yew::prelude::*;
 
-use crate::manager::{GameMode, KeyState, TileState};
+use crate::manager::{EnterButton, GameMode, KeyState, TileState};
 use crate::Msg;
 
 use crate::components::message::Message;
@@ -9,13 +9,6 @@ use crate::components::message::Message;
 const KEYBOARD_0: [char; 10] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'];
 const KEYBOARD_1: [char; 11] = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'];
 const KEYBOARD_2: [char; 7] = ['Z', 'X', 'C', 'V', 'B', 'N', 'M'];
-
-#[derive(PartialEq)]
-pub enum EnterButtonState {
-    Guess,
-    Return,
-    New,
-}
 
 #[derive(Properties, PartialEq)]
 pub struct Props {
@@ -30,7 +23,7 @@ pub struct Props {
     pub is_link_copied: bool,
 
     pub game_mode: GameMode,
-    pub enter_button_state: EnterButtonState,
+    pub enter_button_state: EnterButton,
 
     pub message: String,
     pub word: String,
@@ -140,7 +133,7 @@ pub fn keyboard(props: &Props) -> Html {
                 }
                 {
                     match props.enter_button_state {
-                        EnterButtonState::Return => {
+                        EnterButton::ReturnToPreviousGameMode | EnterButton::MonuliReturnToListView => {
                             html! {
                                 <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
                                     onmousedown={on_click_enter}>
@@ -148,7 +141,7 @@ pub fn keyboard(props: &Props) -> Html {
                                 </button>
                             }
                         }
-                        EnterButtonState::Guess => {
+                        EnterButton::SubmitGuess => {
                             html! {
                                 <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit")}
                                     onmousedown={on_click_enter}>
@@ -156,7 +149,7 @@ pub fn keyboard(props: &Props) -> Html {
                                 </button>
                             }
                         }
-                        EnterButtonState::New => {
+                        EnterButton::RestartGame => {
                             html! {
                                 <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
                                     onmousedown={on_click_enter}>

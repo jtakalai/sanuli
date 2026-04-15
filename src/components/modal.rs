@@ -140,8 +140,6 @@ pub struct MenuModalProps {
     pub total_played: usize,
     pub total_solved: usize,
 
-    #[prop_or_default]
-    pub monuli_auto_sort: bool,
 
     pub monuli_n: usize,
 }
@@ -201,9 +199,6 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
         GameMode::DailyWord(_) | GameMode::Shared
     );
 
-    let is_monuli_large = matches!(props.game_mode, GameMode::Monuli(n) if n > 20);
-    let toggle_auto_sort = onmousedown!(callback, Msg::ToggleAutoSort);
-
     html! {
         <div class="modal">
             <span onmousedown={toggle_menu} class="modal-close">{"✖"}</span>
@@ -254,21 +249,6 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                             </div>
                         </div>
                     </>
-                }
-            } else {
-                html! {}
-            }}
-            {if is_monuli_large {
-                html! {
-                    <div>
-                        <label class="label">{"Järjestä automaattisesti:"}</label>
-                        <div class="select-container">
-                            <button class={classes!("select", props.monuli_auto_sort.then_some(Some("select-active")))}
-                                onmousedown={toggle_auto_sort}>
-                                {if props.monuli_auto_sort { "Päällä" } else { "Pois" }}
-                            </button>
-                        </div>
-                    </div>
                 }
             } else {
                 html! {}

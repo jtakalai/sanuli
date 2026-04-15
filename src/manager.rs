@@ -31,26 +31,6 @@ pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "
 
 pub type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
 
-/// ControlKeyPress(ControlKey) messages can be interpreted by the GameMode to implement a keyboard-driven UI
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum ControlKey {
-    ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Enter,
-}
-
-impl std::str::FromStr for ControlKey {
-    type Err = &'static str;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "ArrowLeft" => Ok(Self::ArrowLeft),
-            "ArrowRight" => Ok(Self::ArrowRight),
-            "ArrowUp" => Ok(Self::ArrowUp),
-            "ArrowDown" => Ok(Self::ArrowDown),
-            "Enter" => Ok(Self::Enter),
-            _ => Err("Invalid key"),
-        }
-    }
-}
-
 #[derive(PartialEq, Copy, Clone)]
 pub enum KeyState {
     Quadruple([TileState; 4]),
@@ -142,6 +122,7 @@ pub enum Theme {
 }
 
 
+/// State of a character on the Keyboard component
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum CharacterState {
     Correct,
@@ -149,6 +130,7 @@ pub enum CharacterState {
     Unknown,
 }
 
+///
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum TileState {
     Correct,
@@ -190,6 +172,17 @@ impl fmt::Display for Theme {
             Theme::Colorblind => write!(f, "colorblind"),
         }
     }
+}
+
+/// Enter button does different things depending on the game mode and whether word is solved or player is still guessing
+/// This is reflected in what it says on the enter button in the Keyboard component
+/// EnterButton is return value from game.enter_button_state()
+#[derive(PartialEq, Clone, Copy, Serialize, Deserialize, Debug)]
+pub enum EnterButton {
+    SubmitGuess,
+    ReturnToPreviousGameMode,
+    RestartGame,
+    MonuliReturnToListView,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Copy)]

@@ -16,7 +16,7 @@ pub type KnownCounts = HashMap<char, CharacterCount>;
 use crate::game;
 use crate::game::{Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists
+    CharacterCount, CharacterState, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists, EnterButton,
 };
 
 #[cfg(web_sys_unstable_apis)]
@@ -697,11 +697,14 @@ impl Game for Sanuli {
         }
     }
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+    fn enter_button_state(&self) -> EnterButton {
+        if self.is_guessing() {
+            EnterButton::SubmitGuess
+        } else if matches!(self.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
+            EnterButton::ReturnToPreviousGameMode
+        } else {
+            EnterButton::RestartGame
+        }
     }
 
     fn persist(&self) -> Result<(), StorageError> {

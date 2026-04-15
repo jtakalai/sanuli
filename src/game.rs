@@ -1,5 +1,3 @@
-use crate::Msg;
-use std::any::Any;
 use std::collections::HashMap;
 
 use gloo_storage::errors::StorageError;
@@ -8,8 +6,10 @@ pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::manager::{
-    CharacterCount, CharacterState, ControlKey, GameMode, KeyState, TileState, WordList
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList,
+    EnterButton,
 };
+use crate::monuli::Monuli;
 
 #[cfg(web_sys_unstable_apis)]
 use crate::manager::Theme;
@@ -50,14 +50,15 @@ pub trait Game {
     fn message(&self) -> String;
     fn previous_guesses(&self) -> Vec<Vec<(char, TileState)>>;
 
-    /// Handle a control key press. This allows GameModes to implement keyboard-driven UIs.
-    fn control_key_press(&mut self, _key: ControlKey) -> Vec<Msg> {
-        vec![]
-    }
+    /// What does the enter button do at this moment: if we're guessing, submit guess; if we're done, restart; etc.
+    fn enter_button_state(&self) -> EnterButton;
 
-    /// For downcasting to concrete game type (e.g. Monuli in view).
-    fn as_any(&self) -> &dyn Any;
-    fn as_any_mut(&mut self) -> &mut dyn Any;
+    /// Special handling for Monuli in main.rs
+    /// TODO: could we do some unsafe cast according to GameMode to avoid this?
+    ///   Maybe passing just Game to MonuliView then unsafe cast Game->Monuli there?
+    fn as_monuli(&self) -> Option<&Monuli> {
+        None
+    }
 }
 
 impl PartialEq for dyn Game {

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::{Board, Game};
 use crate::manager::{
-    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists
+    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists, EnterButton,
 };
 use crate::sanuli::Sanuli;
 
@@ -344,11 +344,12 @@ impl Game for Neluli {
         }
     }
 
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-        self
+    fn enter_button_state(&self) -> EnterButton {
+        if self.is_guessing() {
+            EnterButton::SubmitGuess
+        } else {
+            EnterButton::RestartGame
+        }
     }
 
     fn persist(&self) -> Result<(), StorageError> {
