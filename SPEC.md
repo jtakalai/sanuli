@@ -72,3 +72,27 @@ Paluunappi monulinäkymään
 		- tällöin tietysti olisi aiemmin nähty, että A:ta on vain yksi
 			- esim. PASTA antaisi yhden vihreän ja yhden mustan A:n
 
+# tarkennuksia: 1.1
+
+Monulinäkymässä pitäisi näkyä, missä kohdissa vääriin kohtiin arvatut kirjaimet ovat. Samaan kohtaan voi tulla useita vääriä arvauksia:
+- esimerkki 1.1.1: oikea sana LAHTI
+    - arvaus 1: KAALI (L väärässä paikassa 4)
+    - arvaus 2: TARHA (H väärässä paikassa 4)
+Silloin pitäisi samassa ruudussa olla useampi keltainen kirjain, kuitenkin niitä voi olla maksimissaan neljä viiden kirjaimen sanassa (viimeistään viides olisi oikein). Siispä jos samassa kohdassa on useampi keltainen kirjain, ne pitää merkitä pienemmällä. Yksi mahdollisuus olisi tehdä niistä neljänneksen kokoisia (puolikas korkeus ja leveys).
+
+Kukin monulinäkymän arvausrivi on siis viisi (tai kuusi) kappaletta jotain seuraavista:
+- tyhjä ruutu
+- vihreätaustainen kirjain
+- keltataustainen kirjain
+- 2x2 ruudukko, jossa:
+    - keltataustainen kirjain
+    - tyhjä ruutu
+
+esimerkin 1.1.1 kahden arvauksen jälkeen väritys olisi:
+- keltataustainen T
+- vihreätaustainen A
+- tyhjä ruutu
+- 2x2 ruudukko, jossa:
+    - keltataustainen L
+    - keltataustainen H
+- vihreätaustainen I
