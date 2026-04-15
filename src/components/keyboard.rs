@@ -23,6 +23,9 @@ pub struct Props {
     pub is_link_copied: bool,
 
     pub game_mode: GameMode,
+    /// True when viewing a solved word in Monuli sanuli view.
+    #[prop_or_default]
+    pub monuli_word_solved: bool,
 
     pub message: String,
     pub word: String,
@@ -121,7 +124,20 @@ pub fn keyboard(props: &Props) -> Html {
                     }).collect::<Html>()
                 }
                 {
-                    if props.is_guessing {
+                    if props.monuli_word_solved {
+                        let callback = props.callback.clone();
+                        let onmousedown = Callback::from(move |e: MouseEvent| {
+                            e.prevent_default();
+                            callback.emit(Msg::SelectMonuliWord(None));
+                        });
+
+                        html! {
+                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
+                                onmousedown={onmousedown}>
+                                { "TAKAISIN" }
+                            </button>
+                        }
+                    } else if props.is_guessing {
                         let callback = props.callback.clone();
                         let onmousedown = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();

@@ -13,6 +13,8 @@ pub struct Props {
     pub current_guess: usize,
     pub max_guesses: usize,
     pub word_length: usize,
+    #[prop_or_default]
+    pub board_class: Option<String>,
 }
 
 #[function_component(Board)]
@@ -35,7 +37,7 @@ pub fn board(props: &Props) -> Html {
             <div class={classes!(
                 props.is_reset.then(|| "slide-in"),
                 props.is_reset.then(|| format!("slide-in-{}", props.previous_guesses.len())),
-                format!("board-{}", props.max_guesses))}>{
+                props.board_class.clone().unwrap_or_else(|| format!("board-{}", props.max_guesses)))}>{
                     props.guesses.iter().enumerate().map(|(row, guess)| {
                         let is_current_row = row == props.current_guess && props.is_guessing;
 

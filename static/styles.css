@@ -233,20 +233,20 @@ header {
     width: 1.6rem;
 }
 
-.board-11 {
-    position: absolute;
+.board-monuli {
     display: grid;
-    grid-template-rows: repeat(11, 1fr);
-    width: 220px;
-    height: 450px;
+    grid-auto-rows: auto;
+    width: 300px;
     grid-gap: 4px;
     padding: 8px;
     box-sizing: border-box;
 }
 
-.board-11 .tile {
+.board-monuli .tile {
     font-size: 1.1rem;
     line-height: 1.1rem;
+    width: 2.4rem;
+    height: 2.4rem;
 }
 
 .keyboard {
@@ -497,16 +497,14 @@ header {
         width: 275px;
         height: 330px;
     }
-    .board-11 {
-        width: 180px;
-        height: 370px;
+    .monuli-sanuli-view .board-monuli {
+        width: 240px;
     }
-    .board-11 .tile {
+    .board-monuli .tile {
+        width: 2rem;
+        height: 2rem;
         font-size: 0.9rem;
         line-height: 0.9rem;
-    }
-    .monuli-sanuli-view > div[class*="board-"] {
-        width: 240px;
     }
     .keyboard-button {
         margin-right: 4px;
@@ -699,24 +697,11 @@ header {
     background: var(--absent);
 }
 
-.monuli-sanuli-view > div[class*="board-"] {
-    position: absolute;
-    display: grid;
-    grid-auto-rows: 1fr;
-    width: 300px;
-    height: 90%;
-    max-height: 500px;
-    grid-gap: 3px;
-    padding: 6px;
-    box-sizing: border-box;
-}
-
-.monuli-sanuli-view .tile {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 1;
-    font-size: 1.1rem;
-    line-height: 1.1rem;
+.monuli-sanuli-view {
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 /* Monuli list view */
@@ -771,8 +756,13 @@ header {
 .monuli-compact-row {
     display: flex;
     cursor: pointer;
-    padding: 0;
+    padding: 2px 0;
     align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    position: relative;
+    box-sizing: border-box;
 }
 
 .compact-cells-main {
@@ -781,13 +771,32 @@ header {
     flex-shrink: 0;
 }
 
-.compact-cells-extra {
-    margin-left: 10px;
+.compact-cells-side {
+    width: 42px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .monuli-compact-row:hover {
     background-color: var(--unknown);
+}
+
+.monuli-row-selected {
+    background-color: #1a3a5c;
+}
+
+.monuli-row-selected:hover {
+    background-color: #1a3a5c;
+}
+
+.monuli-row-arrow {
+    position: absolute;
+    right: 8px;
+    color: var(--white);
+    font-size: 1.2rem;
+    opacity: 0.8;
 }
 
 .compact-cell {
@@ -849,11 +858,11 @@ header {
     border: none;
 }
 
-/* Monuli overview (zoomed-out multi-column grid) */
+/* Monuli overview (zoomed-out 4-column grid) */
 .monuli-overview-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
+    display: grid;
+    grid-template-columns: repeat(4, auto);
+    gap: 4px;
     justify-content: center;
     align-content: flex-start;
     flex: 1 1 0;

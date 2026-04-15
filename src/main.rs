@@ -3,6 +3,8 @@ use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
 
+use game::Game;
+
 mod components;
 mod game;
 mod manager;
@@ -44,6 +46,11 @@ pub enum Msg {
     ResetGame,
     SelectMonuliWord(Option<usize>),
     MonuliSetOverview(bool),
+    ArrowLeft,
+    ArrowRight,
+    ArrowUp,
+    ArrowDown,
+    ToggleAutoSort,
 }
 
 pub struct App {
@@ -92,6 +99,18 @@ impl Component for App {
             } else if e.key() == "Enter" {
                 e.prevent_default();
                 Some(Msg::Enter)
+            } else if e.key() == "ArrowLeft" {
+                e.prevent_default();
+                Some(Msg::ArrowLeft)
+            } else if e.key() == "ArrowRight" {
+                e.prevent_default();
+                Some(Msg::ArrowRight)
+            } else if e.key() == "ArrowUp" {
+                e.prevent_default();
+                Some(Msg::ArrowUp)
+            } else if e.key() == "ArrowDown" {
+                e.prevent_default();
+                Some(Msg::ArrowDown)
             } else {
                 None
             }
@@ -124,6 +143,16 @@ impl Component for App {
                 let link = ctx.link();
 
                 if let Some(game) = &self.manager.game {
+                    // In Monuli sanuli view for a solved word, Enter = go back
+                    if matches!(game.game_mode(), GameMode::Monuli(_)) {
+                        if let Some(idx) = game.monuli_selected_word() {
+                            if game.monuli_word_is_solved(idx) {
+                                link.send_message(Msg::SelectMonuliWord(None));
+                                return true;
+                            }
+                        }
+                    }
+
                     if game.is_guessing() {
                         link.send_message(Msg::Guess);
                     } else {
@@ -207,6 +236,16 @@ impl Component for App {
             Msg::ResetGame => self.manager.reset_game(),
             Msg::SelectMonuliWord(idx) => {
                 if let Some(g) = self.manager.game.as_mut() {
+                    if let (Some(word_idx), Some(monuli)) = (idx, g.as_any_mut().downcast_mut::<Monuli>()) {
+                        if monuli.word_is_solved(word_idx) {
+                            monuli.list_cursor = None;
+                        } else {
+                            let order = monuli.word_order();
+                            if let Some(pos) = order.iter().position(|&i| i == word_idx) {
+                                monuli.list_cursor = Some(pos);
+                            }
+                        }
+                    }
                     g.set_monuli_selected_word(idx);
                 }
             }
@@ -215,6 +254,82 @@ impl Component for App {
                     if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
                         monuli.show_overview = show;
                         monuli.selected_word_index = None;
+                    }
+                }
+            }
+            Msg::ArrowLeft => {
+                if let Some(g) = &self.manager.game {
+                    if matches!(g.game_mode(), GameMode::Monuli(_)) && g.monuli_selected_word().is_some() {
+                        ctx.link().send_message(Msg::SelectMonuliWord(None));
+                    }
+                }
+            }
+            Msg::ArrowRight => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        if monuli.selected_word_index.is_none() {
+                            if let Some(cursor) = monuli.list_cursor {
+                                let order = monuli.word_order();
+                                if let Some(&word_idx) = order.get(cursor) {
+                                    monuli.selected_word_index = Some(word_idx);
+                                    monuli.show_overview = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Msg::ArrowUp => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        if monuli.selected_word_index.is_none() {
+                            let order = monuli.word_order();
+                            let game_over = !monuli.is_guessing();
+                            let n = if game_over { order.len() } else {
+                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
+                            };
+                            if n > 0 {
+                                monuli.list_cursor = Some(match monuli.list_cursor {
+                                    None => n - 1,
+                                    Some(0) => n - 1,
+                                    Some(c) => (c - 1).min(n - 1),
+                                });
+                            }
+                            if monuli.show_overview {
+                                monuli.show_overview = false;
+                            }
+                        }
+                    }
+                }
+            }
+            Msg::ArrowDown => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        if monuli.selected_word_index.is_none() {
+                            let order = monuli.word_order();
+                            let game_over = !monuli.is_guessing();
+                            let n = if game_over { order.len() } else {
+                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
+                            };
+                            if n > 0 {
+                                monuli.list_cursor = Some(match monuli.list_cursor {
+                                    None => 0,
+                                    Some(c) if c >= n - 1 => 0,
+                                    Some(c) => c + 1,
+                                });
+                            }
+                            if monuli.show_overview {
+                                monuli.show_overview = false;
+                            }
+                        }
+                    }
+                }
+            }
+            Msg::ToggleAutoSort => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        monuli.auto_sort = !monuli.auto_sort;
+                        let _ = monuli.persist();
                     }
                 }
             }
@@ -277,6 +392,7 @@ impl Component for App {
                                                             previous_guesses={vec![]}
                                                             max_guesses={game.max_guesses()}
                                                             word_length={game.word_length()}
+                                                            board_class={"board-monuli".to_string()}
                                                         />
                                                     </div>
                                                 </>
@@ -350,6 +466,7 @@ impl Component for App {
                                             }
                                         }
 
+                                        let list_cursor = monuli.list_cursor;
                                         let has_overview = n_words > 10;
                                         let on_show_all = link.callback(move |e: MouseEvent| {
                                             e.prevent_default();
@@ -403,22 +520,30 @@ impl Component for App {
                                                                 },
                                                             }
                                                         };
+                                                        let is_cursor = list_cursor == Some(pos);
+                                                        let row_class = if is_cursor {
+                                                            format!("row-{} monuli-compact-row monuli-row-selected", word_length)
+                                                        } else {
+                                                            format!("row-{} monuli-compact-row", word_length)
+                                                        };
                                                         html! {
                                                             <>
                                                                 { if is_first_solved {
                                                                     html! { <div class="monuli-separator">{"Ratkaistut sanulit"}</div> }
                                                                 } else { html! {} } }
-                                                                <div class={format!("row-{} monuli-compact-row", word_length)}
+                                                                <div class={row_class}
                                                                      onmousedown={onselect}>
+                                                                    <div class="compact-cells-side"></div>
                                                                     <div class="compact-cells-main">
                                                                         { compact.iter().map(&render_cell).collect::<Html>() }
                                                                     </div>
-                                                                    { if let Some(ref ex) = extra {
-                                                                        html! {
-                                                                            <div class="compact-cells-extra">
-                                                                                { render_cell(ex) }
-                                                                            </div>
-                                                                        }
+                                                                    <div class="compact-cells-side">
+                                                                        { if let Some(ref ex) = extra {
+                                                                            render_cell(ex)
+                                                                        } else { html! {} } }
+                                                                    </div>
+                                                                    { if is_cursor {
+                                                                        html! { <div class="monuli-row-arrow">{"→"}</div> }
                                                                     } else { html! {} } }
                                                                 </div>
                                                             </>
@@ -479,6 +604,11 @@ impl Component for App {
                         is_emojis_copied={self.is_emojis_copied}
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
+                        monuli_word_solved={
+                            game.monuli_selected_word()
+                                .map(|idx| game.monuli_word_is_solved(idx))
+                                .unwrap_or(false)
+                        }
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}
                         last_guess={last_guess}
@@ -495,6 +625,8 @@ impl Component for App {
 
                     {
                         if self.is_menu_visible {
+                            let monuli_auto_sort = game.as_any().downcast_ref::<Monuli>()
+                                .map(|m| m.auto_sort).unwrap_or(false);
                             html! {
                                 <MenuModal
                                     callback={link.callback(move |msg| msg)}
@@ -506,6 +638,7 @@ impl Component for App {
                                     max_streak={self.manager.max_streak}
                                     total_played={self.manager.total_played}
                                     total_solved={self.manager.total_solved}
+                                    monuli_auto_sort={monuli_auto_sort}
                                 />
                             }
                         } else {

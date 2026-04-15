@@ -225,6 +225,16 @@ pub struct Monuli {
     /// When true and selected_word_index is None, show zoomed-out overview instead of list view.
     #[serde(skip)]
     pub show_overview: bool,
+    /// Cursor position in the list view (index into word_order()). None = nothing selected.
+    #[serde(skip)]
+    pub list_cursor: Option<usize>,
+    /// When true, unsolved words in word_order are sorted by compact_row quality after each guess.
+    #[serde(default = "default_auto_sort")]
+    pub auto_sort: bool,
+}
+
+fn default_auto_sort() -> bool {
+    true
 }
 
 impl Default for Monuli {
@@ -251,7 +261,47 @@ impl Monuli {
             .unwrap_or(false)
     }
 
-    /// Order for list view: unsolved first (by index), then solved in solve order.
+    /// Sorting metric for a compact row: higher = better progress.
+    /// green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
+    fn compact_row_sort_key(&self, word_index: usize) -> u64 {
+        let (cells, extra) = self.compact_row(word_index);
+        let mut green_count: u64 = 0;
+        let mut green_pos_metric: u64 = 0;
+        let mut yellow_count: u64 = 0;
+        let mut brown_count: u64 = 0;
+        let n = cells.len();
+        for (pos, cell) in cells.iter().enumerate() {
+            match cell {
+                CompactCell::Green(_) => {
+                    green_count += 1;
+                    green_pos_metric += 1 << (n - 1 - pos);
+                }
+                CompactCell::YellowOne(_) => yellow_count += 1,
+                CompactCell::BrownOne(_) => brown_count += 1,
+                CompactCell::Yellows(v) => {
+                    for &(_, is_brown) in v {
+                        if is_brown { brown_count += 1; } else { yellow_count += 1; }
+                    }
+                }
+                CompactCell::Empty => {}
+            }
+        }
+        if let Some(ref ex) = extra {
+            match ex {
+                CompactCell::YellowOne(_) => yellow_count += 1,
+                CompactCell::BrownOne(_) => brown_count += 1,
+                CompactCell::Yellows(v) => {
+                    for &(_, is_brown) in v {
+                        if is_brown { brown_count += 1; } else { yellow_count += 1; }
+                    }
+                }
+                _ => {}
+            }
+        }
+        green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
+    }
+
+    /// Order for list view: unsolved first (optionally sorted by progress), then solved in solve order.
     pub fn word_order(&self) -> Vec<usize> {
         let mut unsolved: Vec<usize> = self
             .words
@@ -260,6 +310,11 @@ impl Monuli {
             .filter(|(_, w)| !w.is_solved())
             .map(|(i, _)| i)
             .collect();
+        if self.auto_sort && self.current_guess > 0 {
+            unsolved.sort_by(|&a, &b| {
+                self.compact_row_sort_key(b).cmp(&self.compact_row_sort_key(a))
+            });
+        }
         let mut solved: Vec<(usize, usize)> = self
             .words
             .iter()
@@ -305,6 +360,7 @@ impl Monuli {
         let idx = self
             .selected_word_index
             .filter(|&i| i < self.words.len())
+            .or_else(|| self.words.iter().position(|w| !w.is_solved()))
             .unwrap_or(0);
         self.words
             .get(idx)
@@ -345,55 +401,29 @@ impl Monuli {
         allow_profanities: bool,
         word_lists: Rc<WordLists>,
     ) -> Self {
-        let max_guesses = n_words + 1;
-        let mut words = Vec::with_capacity(n_words);
         let mut used = HashSet::new();
-        for _ in 0..n_words {
-            let word = get_random_word_excluding(
-                word_list,
-                word_length,
-                allow_profanities,
-                &word_lists,
-                &used,
-            )
-            .unwrap_or_else(|| vec!['X'; word_length]);
-            used.insert(word.clone());
-            let guesses = std::iter::repeat(Vec::with_capacity(word_length))
-                .take(max_guesses)
-                .collect::<Vec<_>>();
-            let known_states = std::iter::repeat(HashMap::new())
-                .take(max_guesses)
-                .collect::<Vec<_>>();
-            let known_counts = std::iter::repeat(HashMap::new())
-                .take(max_guesses)
-                .collect::<Vec<_>>();
-            words.push(MonuliWordState {
-                word,
-                guesses,
-                known_states,
-                known_counts,
-                solved_at: None,
-            });
-        }
-        Self {
-            game_mode: GameMode::Monuli(n_words),
-            word_list,
-            word_length,
-            n_words,
-            words,
-            current_guess: 0,
-            streak: 0,
-            message: String::new(),
-            allow_profanities,
-            word_lists,
-            selected_word_index: None,
-            show_overview: n_words > 10,
-        }
+        let words: Vec<Vec<char>> = (0..n_words)
+            .map(|_| {
+                let word = get_random_word_excluding(
+                    word_list,
+                    word_length,
+                    allow_profanities,
+                    &word_lists,
+                    &used,
+                )
+                .unwrap_or_else(|| vec!['X'; word_length]);
+                used.insert(word.clone());
+                word
+            })
+            .collect();
+        let mut m = Self::new_with_words(word_length, words, word_list, word_lists);
+        m.allow_profanities = allow_profanities;
+        m
     }
 
-    /// Create a Monuli with fixed words (for tests). Caller must provide word_lists
-    /// that include any guess words so submit_guess accepts them.
-    #[cfg(test)]
+    /// Create a Monuli with fixed words. In production, called by `new`.
+    /// In tests, caller must provide word_lists that include any guess words
+    /// so submit_guess accepts them.
     pub fn new_with_words(
         word_length: usize,
         words: Vec<Vec<char>>,
@@ -435,7 +465,9 @@ impl Monuli {
             allow_profanities: true,
             word_lists,
             selected_word_index: None,
-            show_overview: n_words > 10,
+            show_overview: n_words > 20,
+            list_cursor: None,
+            auto_sort: true,
         }
     }
 
@@ -470,7 +502,8 @@ impl Monuli {
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
         game.selected_word_index = None;
-        game.show_overview = game.n_words > 10;
+        game.show_overview = game.n_words > 20;
+        game.list_cursor = None;
         game.refresh();
         Ok(game)
     }
@@ -605,6 +638,9 @@ impl Game for Monuli {
     fn monuli_selected_word(&self) -> Option<usize> {
         self.selected_word_index
     }
+    fn monuli_word_is_solved(&self, word_index: usize) -> bool {
+        self.word_is_solved(word_index)
+    }
     fn set_monuli_selected_word(&mut self, index: Option<usize>) {
         self.selected_word_index = index;
         if index.is_some() {
@@ -630,12 +666,15 @@ impl Game for Monuli {
     }
     fn keyboard_tilestate_for_word(&self, word_index: usize, key: &char) -> KeyState {
         match self.words.get(word_index) {
-            Some(w) => KeyState::Single(game::keyboard_tile_state(
-                key,
-                self.current_guess,
-                &w.known_states,
-                &w.known_counts,
-            )),
+            Some(w) => {
+                let idx = self.current_guess.min(w.known_states.len() - 1);
+                KeyState::Single(game::keyboard_tile_state(
+                    key,
+                    idx,
+                    &w.known_states,
+                    &w.known_counts,
+                ))
+            }
             None => KeyState::Single(TileState::Unknown),
         }
     }
@@ -680,6 +719,9 @@ impl Game for Monuli {
             }
         }
 
+        let cursor_word_idx = self.list_cursor
+            .and_then(|pos| self.word_order().get(pos).copied());
+
         let guess_idx = self.current_guess;
         for w in self.words.iter_mut() {
             if w.is_solved() {
@@ -701,6 +743,12 @@ impl Game for Monuli {
                 if all_correct {
                     w.solved_at = Some(guess_idx);
                 }
+            }
+        }
+
+        if let Some(wi) = cursor_word_idx {
+            if self.word_is_solved(wi) {
+                self.list_cursor = None;
             }
         }
 
@@ -865,5 +913,74 @@ mod tests {
             &[g('M'), g('Ä'), E, E, E], Some(ys(&['Ä', 'R'])));
         // SPEC 1.3.1: L appears 2x as yellow but max 1 per guess → brown
         test_compact_row("LAHTI", &["KAALI", "PALVI"], &[E, g('A'), b('L'), b('L'), g('I')], None);
+    }
+
+    fn make_test_monuli(words: &[&str]) -> Monuli {
+        let word_length = words[0].len();
+        let all_words: HashSet<Vec<char>> = words.iter().map(|w| w.chars().collect()).collect();
+        let mut word_lists: WordLists = HashMap::new();
+        word_lists.insert((WordList::Full, word_length), all_words.clone());
+        word_lists.insert((WordList::Common, word_length), all_words);
+        Monuli::new_with_words(
+            word_length,
+            words.iter().map(|w| w.chars().collect()).collect(),
+            WordList::Common,
+            Rc::new(word_lists),
+        )
+    }
+
+    fn type_and_submit(monuli: &mut Monuli, guess: &str) {
+        for c in guess.chars() {
+            monuli.push_character(c);
+        }
+        monuli.submit_guess();
+    }
+
+    #[test]
+    fn solve_all_words_one_by_one() {
+        let words = ["LAHTI", "HANHI", "HURJA", "MÄÄRÄ", "LEIPÄ", "PALVI", "MÖKKI", "RAMPA"];
+        let mut m = make_test_monuli(&words);
+        assert_eq!(m.n_words, 8);
+        assert_eq!(m.max_guesses(), 9);
+        assert!(m.is_guessing());
+
+        // First guess: a throwaway (can't solve on first guess due to replacement rule).
+        // Use "LAHTI" which is in our word list; it will be replaced since it matches word 0.
+        // Use a neutral word instead — add it to word list.
+        // Actually, let's just add an extra word to the word list for the first guess.
+        let extra: Vec<char> = "TAKKI".chars().collect();
+        if let Some(list) = Rc::get_mut(&mut m.word_lists) {
+            list.get_mut(&(WordList::Full, 5)).unwrap().insert(extra.clone());
+            list.get_mut(&(WordList::Common, 5)).unwrap().insert(extra);
+        }
+        type_and_submit(&mut m, "TAKKI");
+        assert_eq!(m.current_guess, 1);
+        assert!(m.is_guessing());
+
+        // Now solve each word one by one (cheating: guess the correct answer).
+        // In Monuli, all unsolved words receive each guess, so guessing word[i] solves it.
+        for i in 0..8 {
+            assert!(m.is_guessing(), "should still be guessing before solving word {i}");
+            type_and_submit(&mut m, words[i]);
+            assert!(
+                m.words[i].is_solved(),
+                "word {i} ({}) should be solved", words[i]
+            );
+            // keyboard_tilestate_for_word must not panic even after the game ends
+            for &c in &['A', 'B', 'C'] {
+                let _ = m.keyboard_tilestate_for_word(i, &c);
+            }
+        }
+
+        assert!(!m.is_guessing(), "game should be over (all solved)");
+        assert!(m.is_winner());
+        assert_eq!(m.current_guess, 9);
+
+        // After game ends, keyboard_tilestate_for_word must still work
+        for wi in 0..8 {
+            for &c in &['A', 'L', 'H', 'T', 'I'] {
+                let _ = m.keyboard_tilestate_for_word(wi, &c);
+            }
+        }
     }
 }

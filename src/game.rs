@@ -63,6 +63,10 @@ pub trait Game {
     fn keyboard_tilestate_for_word(&self, _word_index: usize, _key: &char) -> KeyState {
         KeyState::Single(TileState::Unknown)
     }
+    /// Whether a specific word is solved (Monuli). Default: false.
+    fn monuli_word_is_solved(&self, _word_index: usize) -> bool {
+        false
+    }
 
     /// For downcasting to concrete game type (e.g. Monuli in view).
     fn as_any(&self) -> &dyn Any;
