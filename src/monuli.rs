@@ -572,11 +572,17 @@ impl Game for Monuli {
         self.allow_profanities = is_allowed;
     }
     fn title(&self) -> String {
-        if self.best_score > 0 {
-            format!("{}:n monuli ({}/{}) — Paras: {}", self.n_words, self.current_guess + 1, self.max_guesses(), self.best_score)
+        let guess_num_str = if self.current_guess < self.max_guesses() {
+            format!(" ({}/{})", self.current_guess + 1, self.max_guesses())
         } else {
-            format!("{}:n monuli ({}/{})", self.n_words, self.current_guess + 1, self.max_guesses())
-        }
+            String::new()
+        };
+        let best_score_str = if self.best_score > 0 {
+            format!(" — Paras: {}", self.best_score)
+        } else {
+            String::new()
+        };
+        format!("{}:n monuli{}{}", self.n_words, guess_num_str, best_score_str)
     }
     fn next_word(&mut self) {
         *self = Self::new(
