@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::game::{Board, Game};
 use crate::manager::{
-    GameMode, KeyState, TileState, WordList, WordLists,
-    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
+    ControlKey, DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists
 };
 use crate::sanuli::Sanuli;
 

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::str::FromStr;
 use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
@@ -15,13 +16,13 @@ mod sanuli;
 use components::{
     board::Board,
     header::Header,
-    keyboard::Keyboard,
+    keyboard::{Keyboard, EnterButtonState},
     modal::{HelpModal, MenuModal},
 };
-use manager::{GameMode, KeyState, Manager, Theme, WordList};
+use manager::{ControlKey, GameMode, KeyState, Manager, Theme, WordList};
 use monuli::{CompactTile, Monuli};
 
-const ALLOWED_KEYS: [char; 28] = [
+const ALLOWED_GUESS_KEYS: [char; 28] = [
     'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
     'Ö', 'Ä', 'Z', 'X', 'C', 'V', 'B', 'N', 'M',
 ];
@@ -44,13 +45,11 @@ pub enum Msg {
     ShareLink,
     RevealHiddenTiles,
     ResetGame,
-    SelectMonuliWord(Option<usize>),
     /// (show, optional word_order index to focus when closing)
     MonuliSetOverview(bool, Option<usize>),
-    ArrowLeft,
-    ArrowRight,
-    ArrowUp,
-    ArrowDown,
+    SelectMonuliWord(Option<usize>),
+    /// ControlKeyPress events can be interpreted by the GameMode to implement a keyboard-driven UI
+    ControlKeyPress(ControlKey),
     ToggleAutoSort,
 }
 
@@ -104,7 +103,7 @@ impl Component for App {
         let cb = ctx.link().batch_callback(|e: KeyboardEvent| {
             if e.key().chars().count() == 1 {
                 let key = e.key().to_uppercase().chars().next().unwrap();
-                if ALLOWED_KEYS.contains(&key) && !e.ctrl_key() && !e.alt_key() && !e.meta_key() {
+                if ALLOWED_GUESS_KEYS.contains(&key) && !e.ctrl_key() && !e.alt_key() && !e.meta_key() {
                     e.prevent_default();
                     Some(Msg::KeyPress(key))
                 } else {
@@ -116,18 +115,9 @@ impl Component for App {
             } else if e.key() == "Enter" {
                 e.prevent_default();
                 Some(Msg::Enter)
-            } else if e.key() == "ArrowLeft" {
+            } else if let Ok(key) = ControlKey::from_str(e.key().as_str()) {
                 e.prevent_default();
-                Some(Msg::ArrowLeft)
-            } else if e.key() == "ArrowRight" {
-                e.prevent_default();
-                Some(Msg::ArrowRight)
-            } else if e.key() == "ArrowUp" {
-                e.prevent_default();
-                Some(Msg::ArrowUp)
-            } else if e.key() == "ArrowDown" {
-                e.prevent_default();
-                Some(Msg::ArrowDown)
+                Some(Msg::ControlKeyPress(key))
             } else {
                 None
             }
@@ -160,21 +150,13 @@ impl Component for App {
                 let link = ctx.link();
 
                 if let Some(game) = &self.manager.game {
-                    // In Monuli sanuli view for a solved word, Enter = go back
-                    if matches!(game.game_mode(), GameMode::Monuli(_)) {
-                        if let Some(idx) = game.monuli_selected_word() {
-                            if game.monuli_word_is_solved(idx) {
-                                link.send_message(Msg::SelectMonuliWord(None));
-                                return true;
-                            }
-                        }
-                    }
-
                     if game.is_guessing() {
                         link.send_message(Msg::Guess);
                     } else {
                         if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
                             link.send_message(Msg::ChangePreviousGameMode);
+                        } else if matches!(game.game_mode(), GameMode::Monuli(_)) {
+                            link.send_message(Msg::ControlKeyPress(ControlKey::Enter));
                         } else {
                             link.send_message(Msg::NextWord);
                         }
@@ -255,26 +237,11 @@ impl Component for App {
                 if let Some(g) = self.manager.game.as_mut() {
                     if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
                         if let Some(word_idx) = idx {
-                            let cursor_was_active = monuli.list_cursor.is_some();
-                            if monuli.word_is_solved(word_idx) {
-                                monuli.list_cursor = None;
-                            } else if cursor_was_active {
-                                let order = monuli.word_order();
-                                if let Some(pos) = order.iter().position(|&i| i == word_idx) {
-                                    monuli.list_cursor = Some(pos);
-                                }
-                            }
+                            monuli.select_monuli_word(word_idx);
                         } else {
-                            // Returning from single word view: scroll to the previously selected word
-                            if let Some(prev_idx) = monuli.selected_word_index {
-                                let order = monuli.word_order();
-                                if let Some(pos) = order.iter().position(|&i| i == prev_idx) {
-                                    monuli.list_scroll_to = Some(pos);
-                                }
-                            }
+                            monuli.deselect_monuli_word();
                         }
                     }
-                    g.set_monuli_selected_word(idx);
                 }
             }
             Msg::MonuliSetOverview(show, focus_idx) => {
@@ -291,77 +258,11 @@ impl Component for App {
                     }
                 }
             }
-            Msg::ArrowLeft => {
-                if let Some(g) = &self.manager.game {
-                    if matches!(g.game_mode(), GameMode::Monuli(_)) && g.monuli_selected_word().is_some() {
-                        ctx.link().send_message(Msg::SelectMonuliWord(None));
-                    }
-                }
-            }
-            Msg::ArrowRight => {
-                if let Some(g) = self.manager.game.as_mut() {
-                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
-                        if monuli.selected_word_index.is_none() {
-                            if let Some(cursor) = monuli.list_cursor {
-                                let order = monuli.word_order();
-                                if let Some(&word_idx) = order.get(cursor) {
-                                    monuli.selected_word_index = Some(word_idx);
-                                    monuli.show_overview = false;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Msg::ArrowUp => {
-                if let Some(g) = self.manager.game.as_mut() {
-                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
-                        if monuli.selected_word_index.is_none() {
-                            let order = monuli.word_order();
-                            let game_over = !monuli.is_guessing();
-                            let n = if game_over { order.len() } else {
-                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
-                            };
-                            if n > 0 {
-                                let new_cursor = match monuli.list_cursor {
-                                    None => n - 1,
-                                    Some(0) => n - 1,
-                                    Some(c) => (c - 1).min(n - 1),
-                                };
-                                monuli.list_cursor = Some(new_cursor);
-                                monuli.list_ensure_visible = Some(new_cursor);
-                            }
-                            if monuli.show_overview {
-                                monuli.show_overview = false;
-                                monuli.list_scroll_to = monuli.list_cursor;
-                            }
-                        }
-                    }
-                }
-            }
-            Msg::ArrowDown => {
-                if let Some(g) = self.manager.game.as_mut() {
-                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
-                        if monuli.selected_word_index.is_none() {
-                            let order = monuli.word_order();
-                            let game_over = !monuli.is_guessing();
-                            let n = if game_over { order.len() } else {
-                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
-                            };
-                            if n > 0 {
-                                let new_cursor = match monuli.list_cursor {
-                                    None => 0,
-                                    Some(c) if c >= n - 1 => 0,
-                                    Some(c) => c + 1,
-                                };
-                                monuli.list_cursor = Some(new_cursor);
-                                monuli.list_ensure_visible = Some(new_cursor);
-                            }
-                            if monuli.show_overview {
-                                monuli.show_overview = false;
-                                monuli.list_scroll_to = monuli.list_cursor;
-                            }
-                        }
+            Msg::ControlKeyPress(control_key) => {
+                if let Some(game) = self.manager.game.as_mut() {
+                    let msgs = game.control_key_press(control_key);
+                    if !msgs.is_empty() {
+                        ctx.link().send_message_batch(msgs);
                     }
                 }
             }
@@ -381,7 +282,7 @@ impl Component for App {
     fn view(&self, ctx: &Context<Self>) -> Html {
         let link = ctx.link();
         if let Some(game) = &self.manager.game {
-            let keyboard_state: HashMap<char, KeyState> = ALLOWED_KEYS
+            let keyboard_state: HashMap<char, KeyState> = ALLOWED_GUESS_KEYS
                 .iter()
                 .map(|key| (*key, game.keyboard_tilestate(key)))
                 .collect();
@@ -389,6 +290,19 @@ impl Component for App {
             let last_guess = game.last_guess();
 
             let boards = game.boards();
+
+            let monuli_word_solved = game.monuli_selected_word()
+                .map(|idx| game.monuli_word_is_solved(idx))
+                .unwrap_or(false);
+            let enter_button_state = if monuli_word_solved {
+                EnterButtonState::Return
+            } else if game.is_guessing() {
+                EnterButtonState::Guess
+            } else if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
+                EnterButtonState::Return
+            } else {
+                EnterButtonState::New
+            };
 
             html! {
                 <div class={classes!("game", self.manager.theme.to_string())}>
@@ -680,11 +594,7 @@ impl Component for App {
                         is_emojis_copied={self.is_emojis_copied}
                         is_link_copied={self.is_link_copied}
                         game_mode={game.game_mode().clone()}
-                        monuli_word_solved={
-                            game.monuli_selected_word()
-                                .map(|idx| game.monuli_word_is_solved(idx))
-                                .unwrap_or(false)
-                        }
+                        enter_button_state={enter_button_state}
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}
                         last_guess={last_guess}

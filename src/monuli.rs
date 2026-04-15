@@ -5,9 +5,10 @@ use std::rc::Rc;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
+use crate::Msg;
 use crate::game::{self, KnownCounts, KnownStates, Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists, ControlKey,
     DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
 };
 
@@ -255,6 +256,21 @@ impl Monuli {
             .unwrap_or(false)
     }
 
+    /// Move from monuli list view to sanuli view
+    pub fn select_monuli_word(&mut self, word_index: usize) {
+        self.selected_word_index = Some(word_index);
+        self.show_overview = false;
+    }
+
+    /// Move from sanuli view to monuli list view
+    pub fn deselect_monuli_word(&mut self) {
+        self.selected_word_index = None;
+    }
+
+    fn monuli_selected_word(&self) -> Option<usize> {
+        self.selected_word_index
+    }
+
     /// Sorting metric for a compact row: higher = better progress.
     /// green_count * 1_000_000 + green_pos_metric * 1_000 + yellow_count * 10 + brown_count
     fn compact_row_sort_key(&self, word_index: usize) -> u64 {
@@ -285,6 +301,8 @@ impl Monuli {
     }
 
     /// Order for list view: unsolved first (optionally sorted by progress), then solved in solve order.
+    /// # Returns
+    /// Indices into self.words, in display order.
     pub fn word_order(&self) -> Vec<usize> {
         let mut unsolved: Vec<usize> = self
             .words
@@ -631,17 +649,106 @@ impl Game for Monuli {
         }
         KeyState::Single(TileState::Unknown)
     }
-    fn monuli_selected_word(&self) -> Option<usize> {
-        self.selected_word_index
+
+    fn control_key_press(&mut self, key: ControlKey) -> Vec<crate::Msg> {
+        match key {
+            ControlKey::Enter => {
+                // return to monuli view if in sanuli view and the word is solved
+                if let Some(idx) = self.selected_word_index {
+                    if self.word_is_solved(idx) {
+                        vec![Msg::SelectMonuliWord(None)]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![] // submit guess is handled via Msg::Enter in main.rs:update
+                }
+            }
+            ControlKey::ArrowLeft => {
+                if let Some(word_idx) = self.selected_word_index {
+                    let cursor_was_active = self.list_cursor.is_some();
+                    if self.word_is_solved(word_idx) {
+                        self.list_cursor = None;
+                    } else if cursor_was_active {
+                        let order = self.word_order();
+                        if let Some(pos) = order.iter().position(|&i| i == word_idx) {
+                            self.list_cursor = Some(pos);
+                        }
+                    }
+                } else {
+                    // Returning from single word view: scroll to the previously selected word
+                    if let Some(prev_idx) = self.selected_word_index {
+                        let order = self.word_order();
+                        if let Some(pos) = order.iter().position(|&i| i == prev_idx) {
+                            self.list_scroll_to = Some(pos);
+                        }
+                    }
+                }
+
+                vec![Msg::SelectMonuliWord(None)]
+            }
+            ControlKey::ArrowRight => {
+                if self.selected_word_index.is_some() { return vec![]; }
+                if let Some(cursor) = self.list_cursor {
+                    let order = self.word_order();
+                    if let Some(&word_index) = order.get(cursor) {
+                        vec![Msg::SelectMonuliWord(Some(word_index))]
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                }
+            }
+            ControlKey::ArrowUp => {
+                if self.selected_word_index.is_some() { return vec![]; }
+                let order = self.word_order();
+                let game_over = !self.is_guessing();
+                let n = if game_over { order.len() } else {
+                    order.iter().filter(|&&i| !self.word_is_solved(i)).count()
+                };
+                if n > 0 {
+                    let new_cursor = match self.list_cursor {
+                        None => n - 1,
+                        Some(0) => n - 1,
+                        Some(c) => (c - 1).min(n - 1),
+                    };
+                    self.list_cursor = Some(new_cursor);
+                    self.list_ensure_visible = Some(new_cursor);
+                }
+                if self.show_overview {
+                    self.show_overview = false;
+                    self.list_scroll_to = self.list_cursor;
+                }
+                vec![]
+            }
+            ControlKey::ArrowDown => {
+                if self.selected_word_index.is_some() { return vec![]; }
+                let order = self.word_order();
+                let game_over = !self.is_guessing();
+                let n = if game_over { order.len() } else {
+                    order.iter().filter(|&&i| !self.word_is_solved(i)).count()
+                };
+                if n > 0 {
+                    let new_cursor = match self.list_cursor {
+                        None => 0,
+                        Some(c) if c >= n - 1 => 0,
+                        Some(c) => c + 1,
+                    };
+                    self.list_cursor = Some(new_cursor);
+                    self.list_ensure_visible = Some(new_cursor);
+                }
+                if self.show_overview {
+                    self.show_overview = false;
+                    self.list_scroll_to = self.list_cursor;
+                }
+                vec![]
+            }
+        }
     }
+
     fn monuli_word_is_solved(&self, word_index: usize) -> bool {
         self.word_is_solved(word_index)
-    }
-    fn set_monuli_selected_word(&mut self, index: Option<usize>) {
-        self.selected_word_index = index;
-        if index.is_some() {
-            self.show_overview = false;
-        }
     }
     fn board_for_word(&self, word_index: usize) -> Option<Board> {
         let w = self.words.get(word_index)?;

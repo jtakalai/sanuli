@@ -2,6 +2,7 @@ use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::mem;
 use std::rc::Rc;
+use std::sync::Condvar;
 
 use chrono::NaiveDate;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
@@ -16,8 +17,7 @@ pub type KnownCounts = HashMap<char, CharacterCount>;
 use crate::game;
 use crate::game::{Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists,
-    DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
+    CharacterCount, CharacterState, ControlKey, DEFAULT_ALLOW_PROFANITIES, DEFAULT_MAX_GUESSES, DEFAULT_WORD_LENGTH, GameMode, KeyState, SUCCESS_EMOJIS, TileState, WordList, WordLists
 };
 
 #[cfg(web_sys_unstable_apis)]

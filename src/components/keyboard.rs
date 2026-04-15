@@ -10,6 +10,13 @@ const KEYBOARD_0: [char; 10] = ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'
 const KEYBOARD_1: [char; 11] = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ö', 'Ä'];
 const KEYBOARD_2: [char; 7] = ['Z', 'X', 'C', 'V', 'B', 'N', 'M'];
 
+#[derive(PartialEq)]
+pub enum EnterButtonState {
+    Guess,
+    Return,
+    New,
+}
+
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub callback: Callback<Msg>,
@@ -23,9 +30,7 @@ pub struct Props {
     pub is_link_copied: bool,
 
     pub game_mode: GameMode,
-    /// True when viewing a solved word in Monuli sanuli view.
-    #[prop_or_default]
-    pub monuli_word_solved: bool,
+    pub enter_button_state: EnterButtonState,
 
     pub message: String,
     pub word: String,
@@ -37,10 +42,20 @@ pub struct Props {
 #[function_component(Keyboard)]
 pub fn keyboard(props: &Props) -> Html {
     let callback = props.callback.clone();
-    let onbackspace = Callback::from(move |e: MouseEvent| {
-        e.prevent_default();
-        callback.emit(Msg::Backspace);
-    });
+    let onbackspace = {
+        let callback = callback.clone();
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            callback.emit(Msg::Backspace);
+        })
+    };
+    let on_click_enter = {
+        let callback = callback.clone();
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            callback.emit(Msg::Enter);
+        })
+    };
 
     html! {
         <div class="keyboard">
@@ -124,57 +139,30 @@ pub fn keyboard(props: &Props) -> Html {
                     }).collect::<Html>()
                 }
                 {
-                    if props.monuli_word_solved {
-                        let callback = props.callback.clone();
-                        let onmousedown = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(Msg::SelectMonuliWord(None));
-                        });
-
-                        html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
-                                onmousedown={onmousedown}>
-                                { "TAKAISIN" }
-                            </button>
+                    match props.enter_button_state {
+                        EnterButtonState::Return => {
+                            html! {
+                                <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
+                                    onmousedown={on_click_enter}>
+                                    { "TAKAISIN" }
+                                </button>
+                            }
                         }
-                    } else if props.is_guessing {
-                        let callback = props.callback.clone();
-                        let onmousedown = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(Msg::Guess);
-                        });
-
-                        html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit")}
-                                onmousedown={onmousedown}>
-                                { "ARVAA" }
-                            </button>
+                        EnterButtonState::Guess => {
+                            html! {
+                                <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit")}
+                                    onmousedown={on_click_enter}>
+                                    { "ARVAA" }
+                                </button>
+                            }
                         }
-                    } else if matches!(props.game_mode, GameMode::DailyWord(_) | GameMode::Shared) {
-                        let callback = props.callback.clone();
-                        let onmousedown = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(Msg::ChangePreviousGameMode);
-                        });
-
-                        html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
-                                onmousedown={onmousedown}>
-                                { "TAKAISIN" }
-                            </button>
-                        }
-                    } else {
-                        let callback = props.callback.clone();
-                        let onmousedown = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(Msg::NextWord);
-                        });
-
-                        html! {
-                            <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
-                                onmousedown={onmousedown}>
-                                { "UUSI?" }
-                            </button>
+                        EnterButtonState::New => {
+                            html! {
+                                <button data-nosnippet="" class={classes!("keyboard-button", "keyboard-button-submit", "correct")}
+                                    onmousedown={on_click_enter}>
+                                    { "UUSI?" }
+                                </button>
+                            }
                         }
                     }
                 }

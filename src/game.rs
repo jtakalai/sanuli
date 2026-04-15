@@ -1,3 +1,4 @@
+use crate::Msg;
 use std::any::Any;
 use std::collections::HashMap;
 
@@ -7,7 +8,7 @@ pub type KnownStates = HashMap<(char, usize), CharacterState>;
 pub type KnownCounts = HashMap<char, CharacterCount>;
 
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList
+    CharacterCount, CharacterState, ControlKey, GameMode, KeyState, TileState, WordList
 };
 
 #[cfg(web_sys_unstable_apis)]
@@ -49,12 +50,15 @@ pub trait Game {
     fn message(&self) -> String;
     fn previous_guesses(&self) -> Vec<Vec<(char, TileState)>>;
 
+    /// Handle a control key press. This allows GameModes to implement keyboard-driven UIs.
+    fn control_key_press(&mut self, _key: ControlKey) -> Vec<Msg> {
+        vec![]
+    }
+
     /// When in Monuli and a word is selected for sanuli view. None = list view.
     fn monuli_selected_word(&self) -> Option<usize> {
         None
     }
-    /// Set selected word for Monuli sanuli view. No-op for other games.
-    fn set_monuli_selected_word(&mut self, _index: Option<usize>) {}
     /// Board for one word (Monuli sanuli view). None for other games or invalid index.
     fn board_for_word(&self, _word_index: usize) -> Option<Board> {
         None

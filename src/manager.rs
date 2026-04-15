@@ -30,6 +30,26 @@ pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "
 
 pub type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
 
+/// ControlKeyPress(ControlKey) messages can be interpreted by the GameMode to implement a keyboard-driven UI
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum ControlKey {
+    ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Enter,
+}
+
+impl std::str::FromStr for ControlKey {
+    type Err = &'static str;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ArrowLeft" => Ok(Self::ArrowLeft),
+            "ArrowRight" => Ok(Self::ArrowRight),
+            "ArrowUp" => Ok(Self::ArrowUp),
+            "ArrowDown" => Ok(Self::ArrowDown),
+            "Enter" => Ok(Self::Enter),
+            _ => Err("Invalid key"),
+        }
+    }
+}
+
 #[derive(PartialEq, Copy, Clone)]
 pub enum KeyState {
     Quadruple([TileState; 4]),
