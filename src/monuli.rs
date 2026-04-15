@@ -15,6 +15,16 @@ use crate::manager::{
 #[cfg(web_sys_unstable_apis)]
 use crate::manager::Theme;
 
+/// Available choices for monuli size
+pub const MONULI_N_WORDS: [usize; 9] = [8, 10, 16, 25, 36, 49, 64, 81, 100];
+
+/// Number of guesses in monuli, depending on number of words
+/// Currently there is a *cough* feature that when a word is all-green, it is solved;
+///   this means large monuli(N) can be solved in less than N tries
+pub const fn max_guesses(n_words: usize) -> usize {
+    return 4 + n_words * 9 / 10;
+}
+
 /// One cell in a compact row (SPEC 1.1). Each tile is either green, one or more yellows/browns, or empty.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CompactTile {
@@ -221,7 +231,7 @@ pub struct Monuli {
 
 impl Monuli {
     pub fn max_guesses(&self) -> usize {
-        self.n_words + 1
+        max_guesses(self.n_words)
     }
 
     pub fn word_is_solved(&self, word_index: usize) -> bool {
@@ -402,7 +412,7 @@ impl Monuli {
         word_lists: Rc<WordLists>,
     ) -> Self {
         let n_words = words.len();
-        let max_guesses = n_words + 1;
+        let max_guesses = max_guesses(n_words);
         let words_state: Vec<MonuliWordState> = words
             .into_iter()
             .map(|word| {
@@ -948,7 +958,7 @@ mod tests {
         let words = ["LAHTI", "HANHI", "HURJA", "MÄÄRÄ", "LEIPÄ", "PALVI", "MÖKKI", "RAMPA"];
         let mut m = make_test_monuli(&words);
         assert_eq!(m.n_words, 8);
-        assert_eq!(m.max_guesses(), 9);
+        assert_eq!(m.max_guesses(), 11);
         assert!(m.is_guessing());
 
         // Add a throwaway word to the word list for the first guess.

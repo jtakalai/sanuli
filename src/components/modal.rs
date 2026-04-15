@@ -3,6 +3,7 @@ use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
 use crate::manager::{GameMode, Theme, WordList};
+use crate::monuli::{MONULI_N_WORDS, max_guesses as monuli_max_guesses};
 use crate::Msg;
 
 const FORMS_LINK_TEMPLATE_ADD: &str = "https://docs.google.com/forms/d/e/1FAIpQLSfH8gs4sq-Ynn8iGOvlc99J_zOG2rJEC4m8V0kCgF_en3RHFQ/viewform?usp=pp_url&entry.461337706=Lis%C3%A4yst%C3%A4&entry.560255602=";
@@ -49,7 +50,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                         <p>{"Arvaa kätketyt "}<i>{"neljä sanulia"}</i>{" yhdeksällä yrityksellä."}</p>
                     },
                     GameMode::Monuli(n) => html! {
-                        <p>{"Arvaa kätketyt "}<i>{format!("{} sanulia", n)}</i>{format!(" {} yrityksellä.", n + 1)}</p>
+                        <p>{"Arvaa kätketyt "}<i>{format!("{} sanulia", n)}</i>{format!(" {} yrityksellä.", monuli_max_guesses(n))}</p>
                     },
                     _ => html! {
                         <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
@@ -105,7 +106,7 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {"Nelulissa ratkaiset samalla kertaa neljää eri sanulia samoilla arvauksilla. Tavoite on saada kaikki neljä sanulia ratkaistua yhdeksällä arvauksella."}
             </p>
             <p>
-                {"Monulissa ratkaiset monta sanulia (esim. 10) samoilla arvauksilla. Yrityksiä on yksi enemmän kuin sanoja, ja ensimmäinen arvaus on aina väärä. Monulinäkymässä jokainen sana näkyy yhtenä tiivistettynä rivinä:"}
+                {"Monulissa ratkaiset monta sanulia (esim. 10) samoilla arvauksilla. Monulinäkymässä jokainen sana näkyy yhtenä tiivistettynä rivinä:"}
                 {color("correct", " oranssit ", " vihreät ")}
                 {"oikeilla paikoilla,"}
                 {color("present", " siniset ", " keltaiset ")}
@@ -113,9 +114,9 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {color("maybe-present", " harmaat ", " ruskeat ")}
                 {"väärillä paikoilla."}
                 {color("present", " Siniset ", " Keltaiset ")}
-                {"ovat sanassa,"}
-                {color("maybe-present", " harmaat ", " ruskeat ")}
-                {"vain ehkä. Sanaa klikkaamalla aukeaa tuttu sanulinäkymä, jossa näet kaikki arvaukset kyseiselle sanalle."}
+                {"ovat muualla sanassa, "}
+                {color("maybe-present", " harmaista ", " ruskeista ")}
+                {"ei voi olla varma. Sanaa klikkaamalla aukeaa tuttu sanulinäkymä, jossa näet kaikki arvaukset kyseiselle sanalle."}
             </p>
             <p>
                 {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
@@ -300,7 +301,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         </button>
                         <select class={classes!("select", "monuli-split-right", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
                             onchange={on_monuli_n_change}>
-                            { for [8, 10, 20, 30, 50, 70, 100].iter().map(|&n| {
+                            { for MONULI_N_WORDS.iter().map(|&n| {
                                 html! {
                                     <option value={n.to_string()}
                                         selected={*monuli_n == n}>

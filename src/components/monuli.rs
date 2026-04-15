@@ -7,9 +7,7 @@ use crate::components::board::Board;
 #[derive(Properties, PartialEq)]
 pub struct Props {
     pub game: Monuli,
-    pub last_guess: String,
     pub callback: Callback<Msg>,
-    pub max_guesses: usize,
 }
 
 #[function_component(MonuliView)]
@@ -41,7 +39,7 @@ pub fn monuli_view(props: &Props) -> Html {
                             is_reset={false}
                             is_hidden={false}
                             previous_guesses={vec![]}
-                            max_guesses={props.max_guesses}
+                            max_guesses={monuli.max_guesses()}
                             word_length={word_length}
                             board_class={"board-monuli".to_string()}
                         />
@@ -54,7 +52,7 @@ pub fn monuli_view(props: &Props) -> Html {
     } else {
         // List view: single column, scrollable
         let word_order = monuli.word_order();
-        let current_letters: Vec<char> = props.last_guess.chars().collect();
+        let current_letters: Vec<char> = monuli.last_guess().chars().collect();
         let mut first_solved = word_order.len();
         for (pos, &idx) in word_order.iter().enumerate() {
             if monuli.word_is_solved(idx) {

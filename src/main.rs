@@ -302,22 +302,15 @@ impl Component for App {
                     />
 
                     {
-                        match (game.game_mode(), boards.len()) {
-                            (GameMode::Monuli(_), _) => {
-                                if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
-                                    html! {
-                                        <MonuliView
-                                            game={monuli.clone()}
-                                            last_guess={last_guess.clone()}
-                                            callback={link.callback(move |msg| msg)}
-                                            max_guesses={game.max_guesses()}
-                                        />
-                                    }
-                                } else {
-                                    html! { <div class="board-container"><p class="monuli-placeholder">{"Monuli"}</p></div> }
-                                }
-                            },
-                            (_, 1) => html! {
+                        if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
+                            html! {
+                                <MonuliView
+                                    game={monuli.clone()}
+                                    callback={link.callback(move |msg| msg)}
+                                />
+                            }
+                        } else if boards.len() == 1 {
+                            html! {
                                 <div class="board-container">
                                     <Board
                                         guesses={boards[0].guesses.clone()}
@@ -330,8 +323,9 @@ impl Component for App {
                                         word_length={game.word_length()}
                                     />
                                 </div>
-                            },
-                            (_, 4) => html! {
+                            }
+                        } else if boards.len() == 4 {
+                            html! {
                                 <div class="quadruple-container">
                                     <div class="quadruple-grid">
                                         {game.boards().iter().map(|board| {
@@ -350,8 +344,9 @@ impl Component for App {
                                         }).collect::<Html>()}
                                     </div>
                                 </div>
-                            },
-                            _ => html! {}
+                            }
+                        } else {
+                            html! {}
                         }
                     }
 
