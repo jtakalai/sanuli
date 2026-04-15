@@ -149,14 +149,12 @@ impl Component for App {
                 if let Some(game) = &self.manager.game {
                     if game.is_guessing() {
                         link.send_message(Msg::Guess);
+                    } else if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
+                        link.send_message(Msg::ChangePreviousGameMode);
+                    } else if matches!(game.game_mode(), GameMode::Monuli(_)) {
+                        link.send_message(Msg::ControlKeyPress(ControlKey::Enter));
                     } else {
-                        if matches!(game.game_mode(), GameMode::DailyWord(_) | GameMode::Shared) {
-                            link.send_message(Msg::ChangePreviousGameMode);
-                        } else if matches!(game.game_mode(), GameMode::Monuli(_)) {
-                            link.send_message(Msg::ControlKeyPress(ControlKey::Enter));
-                        } else {
-                            link.send_message(Msg::NextWord);
-                        }
+                        link.send_message(Msg::NextWord);
                     }
                 }
             }
@@ -355,7 +353,7 @@ impl Component for App {
                         is_hidden={game.is_hidden()}
                         is_emojis_copied={self.is_emojis_copied}
                         is_link_copied={self.is_link_copied}
-                        game_mode={game.game_mode().clone()}
+                        game_mode={*game.game_mode()}
                         enter_button_state={enter_button_state}
                         message={game.message()}
                         word={game.word().iter().collect::<String>()}

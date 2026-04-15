@@ -22,7 +22,7 @@ pub const MONULI_N_WORDS: [usize; 9] = [8, 10, 16, 25, 36, 49, 64, 81, 100];
 /// Currently there is a *cough* feature that when a word is all-green, it is solved;
 ///   this means large monuli(N) can be solved in less than N tries
 pub const fn max_guesses(n_words: usize) -> usize {
-    return 4 + n_words * 9 / 10;
+    4 + n_words * 9 / 10
 }
 
 /// One cell in a compact row (SPEC 1.1). Each tile is either green, one or more yellows/browns, or empty.
@@ -425,14 +425,11 @@ impl Monuli {
         let words_state: Vec<MonuliWordState> = words
             .into_iter()
             .map(|word| {
-                let guesses = std::iter::repeat(Vec::with_capacity(word_length))
-                    .take(max_guesses)
+                let guesses = std::iter::repeat_n(Vec::with_capacity(word_length), max_guesses)
                     .collect::<Vec<_>>();
-                let known_states = std::iter::repeat(HashMap::new())
-                    .take(max_guesses)
+                let known_states = std::iter::repeat_n(HashMap::new(), max_guesses)
                     .collect::<Vec<_>>();
-                let known_counts = std::iter::repeat(HashMap::new())
-                    .take(max_guesses)
+                let known_counts = std::iter::repeat_n(HashMap::new(), max_guesses)
                     .collect::<Vec<_>>();
                 MonuliWordState {
                     word,
@@ -881,11 +878,9 @@ impl Game for Monuli {
     fn refresh(&mut self) {
         let max_guesses = self.max_guesses();
         for w in self.words.iter_mut() {
-            w.known_states = std::iter::repeat(HashMap::new())
-                .take(max_guesses)
+            w.known_states = std::iter::repeat_n(HashMap::new(), max_guesses)
                 .collect::<Vec<_>>();
-            w.known_counts = std::iter::repeat(HashMap::new())
-                .take(max_guesses)
+            w.known_counts = std::iter::repeat_n(HashMap::new(), max_guesses)
                 .collect::<Vec<_>>();
             for guess_index in 0..self.current_guess {
                 if w.guesses[guess_index].len() == self.word_length {

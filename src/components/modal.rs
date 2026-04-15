@@ -213,11 +213,11 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         <div>
                             <label class="label">{"Sanulien pituus:"}</label>
                             <div class="select-container">
-                                <button class={classes!("select", (props.word_length == 5).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.word_length == 5).then_some(Some("select-active")))}
                                     onmousedown={change_word_length_5}>
                                     {"5 merkkiä"}
                                 </button>
-                                <button class={classes!("select", (props.word_length == 6).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.word_length == 6).then_some(Some("select-active")))}
                                     onmousedown={change_word_length_6}>
                                     {"6 merkkiä"}
                                 </button>
@@ -226,15 +226,15 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         <div>
                             <label class="label">{"Sanulista:"}</label>
                             <div class="select-container">
-                                <button class={classes!("select", (props.current_word_list == WordList::Easy).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.current_word_list == WordList::Easy).then_some(Some("select-active")))}
                                     onmousedown={change_word_list_easy}>
                                     {"Helppo"}
                                 </button>
-                                <button class={classes!("select", (props.current_word_list == WordList::Common).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.current_word_list == WordList::Common).then_some(Some("select-active")))}
                                     onmousedown={change_word_list_common}>
                                     {"Tavallinen"}
                                 </button>
-                                <button class={classes!("select", (props.current_word_list == WordList::Full).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.current_word_list == WordList::Full).then_some(Some("select-active")))}
                                     onmousedown={change_word_list_full}>
                                     {"Vaikea"}
                                 </button>
@@ -243,11 +243,11 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         <div>
                             <label class="label">{"Rumat sanulit:"}</label>
                             <div class="select-container">
-                                <button class={classes!("select", (!props.allow_profanities).then(|| Some("select-active")))}
+                                <button class={classes!("select", (!props.allow_profanities).then_some(Some("select-active")))}
                                     onmousedown={change_allow_profanities_no}>
                                     {"Ei"}
                                 </button>
-                                <button class={classes!("select", (props.allow_profanities).then(|| Some("select-active")))}
+                                <button class={classes!("select", (props.allow_profanities).then_some(Some("select-active")))}
                                     onmousedown={change_allow_profanities_yes}>
                                     {"Kyllä"}
                                 </button>
@@ -263,7 +263,7 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                     <div>
                         <label class="label">{"Järjestä automaattisesti:"}</label>
                         <div class="select-container">
-                            <button class={classes!("select", props.monuli_auto_sort.then(|| Some("select-active")))}
+                            <button class={classes!("select", props.monuli_auto_sort.then_some(Some("select-active")))}
                                 onmousedown={toggle_auto_sort}>
                                 {if props.monuli_auto_sort { "Päällä" } else { "Pois" }}
                             </button>
@@ -276,15 +276,15 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
             <div>
                 <label class="label">{"Pelimuoto:"}</label>
                 <div class="select-container">
-                    <button class={classes!("select", (props.game_mode == GameMode::Classic).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.game_mode == GameMode::Classic).then_some(Some("select-active")))}
                         onmousedown={change_game_mode_classic}>
                         {"Peruspeli"}
                     </button>
-                    <button class={classes!("select", (props.game_mode == GameMode::Relay).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.game_mode == GameMode::Relay).then_some(Some("select-active")))}
                         onmousedown={change_game_mode_relay}>
                         {"Sanuliketju"}
                     </button>
-                    <button class={classes!("select", (props.game_mode == GameMode::Quadruple).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.game_mode == GameMode::Quadruple).then_some(Some("select-active")))}
                         onmousedown={change_game_mode_quadruple}>
                         {"Neluli"}
                     </button>
@@ -324,11 +324,11 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
             <div>
                 <label class="label">{"Teema:"}</label>
                 <div class="select-container">
-                    <button class={classes!("select", (props.theme == Theme::Dark).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.theme == Theme::Dark).then_some(Some("select-active")))}
                         onmousedown={change_theme_dark}>
                         {"Oletus"}
                     </button>
-                    <button class={classes!("select", (props.theme == Theme::Colorblind).then(|| Some("select-active")))}
+                    <button class={classes!("select", (props.theme == Theme::Colorblind).then_some(Some("select-active")))}
                         onmousedown={change_theme_colorblind}>
                         {"Värisokeille"}
                     </button>
