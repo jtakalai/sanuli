@@ -105,7 +105,7 @@ fn sub_message(props: &SubMessageProps) -> Html {
         callback.emit(GameMsg::ShareLink);
     });
 
-    if props.game_mode == GameMode::Quadruple {
+    if props.game_mode == GameMode::Quadruple || matches!(props.game_mode, GameMode::Monuli(_)) {
         return html!{}   
     }
 

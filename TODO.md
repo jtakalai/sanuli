@@ -14,10 +14,10 @@ High-level (from SPEC): N words, N+1 guesses total, first guess guaranteed wrong
 [x] Sanuli sub-view (section 4.2, 4.3, 4.4)
    Add selection state, sanuli view for one word, and back button.
 
-[ ] Overview/zoom (section 5)
+[ ] Overview/zoom (section 5) — skipped: N=10 fits on one screen (per 5.3)
    Add overview when N is large and column/click-to-zoom.
 
-[ ] Help and polish (section 6)
+[x] Help and polish (section 6)
    Documentation and edge cases.
 
 **Review (SPEC 1.1 + implementation so far):** Sections 1 and 3.2 are done. **SPEC 1.1 (tarkennuksia):** In Monulinäkymä, show *where* wrong-position letters landed; the same cell can get multiple yellows from different guesses (e.g. LAHTI: KAALI then TARHA → cell 3 has L and H). When a cell has 2–4 yellows, render as 2×2 grid (quarter-size). So current `compact_row` (yellows filled left-to-right) does not match; need per-position yellows and new cell type (2.5). Section 4.1 list view must render: empty | green+letter | one yellow | 2×2 grid of yellows. Sections 3.1, 3.3–3.4, 4–6 unchanged.
@@ -56,19 +56,19 @@ High-level (from SPEC): N words, N+1 guesses total, first guess guaranteed wrong
 
 ## 4. Monuli UI – two views
 
-- [ ] **4.1** **Monulinäkymä (list view)**
+- [x] **4.1** **Monulinäkymä (list view)**
   - Unlike neluli, one row for the current guess, it should be shown above the (scrollable) list of words
   - Between guess row and keyboard, (scrollable) list of one row per word using compact row. **SPEC 1.1:** Each cell: empty | green+letter | one yellow+letter | 2×2 grid (2–4 yellows in one cell).
   - Order: unsolved first (any internal order), then separator (e.g. black row), then solved in solve order.
   - Keyboard: not colored by hit; color by “used” (e.g. light blue). If a letter is known absent from all remaining words, can use black (reuse sanuli absent style).
   - Implement later: Scrollable list can be multiple columns on wide screens. For now, only one column.
   - Click on a word row → open “sanuli view” for that word (see 4.2).
-- [ ] **4.2** **Sanulinäkymä (single-word view)**
+- [x] **4.2** **Sanulinäkymä (single-word view)**
   - When a word is selected, show classic sanuli board for that word only: all previous guesses as rows, current guess row, full tile coloring.
   - Keyboard colored by that word’s known_states/known_counts (same as current Sanuli).
   - “Back” button to return to monuli list view (no new guess consumed).
-- [ ] **4.3** App-level routing: when `GameMode::Monuli` and no word selected → render monuli list view; when word selected → render sanuli view for that word. Manager/state must hold “selected word index” (or None).
-- [ ] **4.4** Enter/Backspace/typing: in list view, typing applies to “current guess” and submits to all active words (same as Neluli-style); in sanuli view, typing applies only to the selected word. On submit in sanuli view, same rule: one guess consumed globally. Clarify: back from sanuli view doesn’t change guess state; next keypress still applies to the same “current” guess.
+- [x] **4.3** App-level routing: when `GameMode::Monuli` and no word selected → render monuli list view; when word selected → render sanuli view for that word. Manager/state must hold “selected word index” (or None).
+- [x] **4.4** Enter/Backspace/typing: in list view, typing applies to “current guess” and submits to all active words (same as Neluli-style); in sanuli view, typing applies only to the selected word. On submit in sanuli view, same rule: one guess consumed globally. Clarify: back from sanuli view doesn’t change guess state; next keypress still applies to the same “current” guess.
 
 ---
 
@@ -82,9 +82,9 @@ High-level (from SPEC): N words, N+1 guesses total, first guess guaranteed wrong
 
 ## 6. Help and polish
 
-- [ ] **6.1** Add Monuli to help modal text (rules: N words, N+1 guesses, first wrong, one row per word, click for detail).
-- [ ] **6.2** Share / stats: decide if Monuli has share-emojis or share-link; if not, disable or show “Ei saatavilla” for Monuli. Same for streak/totals if needed.
-- [ ] **6.3** Test on narrow (portrait) and wide (landscape) layouts; ensure scroll and column layout work.
+- [x] **6.1** Add Monuli to help modal text (rules: N words, N+1 guesses, first wrong, one row per word, click for detail).
+- [x] **6.2** Share / stats: decide if Monuli has share-emojis or share-link; if not, disable or show “Ei saatavilla” for Monuli. Same for streak/totals if needed.
+- [x] **6.3** Test on narrow (portrait) and wide (landscape) layouts; ensure scroll and column layout work.
 
 ---
 

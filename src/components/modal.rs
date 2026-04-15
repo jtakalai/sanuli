@@ -94,6 +94,9 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {"Nelulissa ratkaiset samalla kertaa neljää eri sanulia samoilla arvauksilla. Tavoite on saada kaikki neljä sanulia ratkaistua yhdeksällä arvauksella."}
             </p>
             <p>
+                {"Monulissa ratkaiset monta sanulia (esim. 10) samoilla arvauksilla. Yrityksiä on yksi enemmän kuin sanoja, ja ensimmäinen arvaus on aina väärä. Monulinäkymässä jokainen sana näkyy yhtenä tiivistettynä rivinä: vihreät oikeilla paikoilla, keltaiset väärillä paikoilla. Sanaa klikkaamalla aukeaa sanulinäkymä, jossa näet kaikki arvaukset kyseiselle sanalle."}
+            </p>
+            <p>
                 {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
                 <a class="link" href={FORMS_LINK_TEMPLATE_ADD}>{"täällä"}</a>
                 {". Kiitos kaikille ehdotuksia jättäneille ja sanulistojen kasaamisessa auttaneille henkilöille!"}

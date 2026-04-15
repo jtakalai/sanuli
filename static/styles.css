@@ -693,7 +693,8 @@ header {
     display: flex;
     flex-direction: column;
     gap: 5px;
-    max-height: 40vh;
+    flex: 1 1 0;
+    min-height: 0;
     overflow-y: auto;
     scrollbar-gutter: stable both-edges;
     width: 100%;
