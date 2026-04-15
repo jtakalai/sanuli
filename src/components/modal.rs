@@ -255,21 +255,23 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
                     </button>
-                    <button class={classes!("select", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
-                        onmousedown={change_game_mode_monuli}>
-                        {"Monuli"}
-                    </button>
-                    <select class="select monuli-size-select"
-                        onchange={on_monuli_n_change}>
-                        { for [4, 8, 16, 32, 64].iter().map(|&n| {
-                            html! {
-                                <option value={n.to_string()}
-                                    selected={*monuli_n == n}>
-                                    { format!("{}kpl", n) }
-                                </option>
-                            }
-                        })}
-                    </select>
+                    <div class="monuli-split-button">
+                        <button class={classes!("select", "monuli-split-left", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
+                            onmousedown={change_game_mode_monuli}>
+                            {"Monuli"}
+                        </button>
+                        <select class={classes!("select", "monuli-split-right", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
+                            onchange={on_monuli_n_change}>
+                            { for [8, 10, 20, 30, 50, 70, 100].iter().map(|&n| {
+                                html! {
+                                    <option value={n.to_string()}
+                                        selected={*monuli_n == n}>
+                                        { n.to_string() }
+                                    </option>
+                                }
+                            })}
+                        </select>
+                    </div>
                 </div>
             </div>
             <div>

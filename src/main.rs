@@ -43,6 +43,7 @@ pub enum Msg {
     RevealHiddenTiles,
     ResetGame,
     SelectMonuliWord(Option<usize>),
+    MonuliSetOverview(bool),
 }
 
 pub struct App {
@@ -209,6 +210,14 @@ impl Component for App {
                     g.set_monuli_selected_word(idx);
                 }
             }
+            Msg::MonuliSetOverview(show) => {
+                if let Some(g) = self.manager.game.as_mut() {
+                    if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
+                        monuli.show_overview = show;
+                        monuli.selected_word_index = None;
+                    }
+                }
+            }
         };
 
         true
@@ -245,6 +254,7 @@ impl Component for App {
                             (GameMode::Monuli(_), _) => {
                                 if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
                                     if let Some(word_idx) = monuli.selected_word_index {
+                                        // Sanuli view for a single word
                                         if let Some(board) = game.board_for_word(word_idx) {
                                             let onback = link.callback(move |e: MouseEvent| {
                                                 e.prevent_default();
@@ -274,17 +284,33 @@ impl Component for App {
                                         } else {
                                             html! {}
                                         }
-                                    } else {
+                                    } else if monuli.show_overview {
+                                        // Overview: compact grid of all words
                                         let word_length = game.word_length();
                                         let word_order = monuli.word_order();
+                                        let n_words = word_order.len();
                                         let current_letters: Vec<char> = last_guess.chars().collect();
-                                        let mut first_solved = word_order.len();
-                                        for (pos, &idx) in word_order.iter().enumerate() {
-                                            if monuli.word_is_solved(idx) {
-                                                first_solved = pos;
-                                                break;
+
+                                        let show_letters = n_words <= 20;
+
+                                        let render_overview_cell = move |cell: &CompactCell| -> Html {
+                                            let (class, letter) = match cell {
+                                                CompactCell::Empty => ("overview-cell overview-cell-empty", None),
+                                                CompactCell::Green(c) => ("overview-cell overview-cell-green", if show_letters { Some(*c) } else { None }),
+                                                CompactCell::YellowOne(c) => ("overview-cell overview-cell-yellow", if show_letters { Some(*c) } else { None }),
+                                                CompactCell::Yellows(_) => ("overview-cell overview-cell-yellow", None),
+                                            };
+                                            if let Some(ch) = letter {
+                                                html! { <div class={class}>{ ch }</div> }
+                                            } else {
+                                                html! { <div class={class}></div> }
                                             }
-                                        }
+                                        };
+
+                                        let cell_size = if n_words <= 20 { 16 } else if n_words <= 50 { 10 } else { 7 };
+                                        let row_width = word_length * cell_size + (word_length - 1) * 2;
+                                        let style_var = format!("--overview-cell-size: {}px; --overview-row-width: {}px;", cell_size, row_width);
+
                                         html! {
                                             <div class="monuli-list-view">
                                                 <div class={format!("row-{}", word_length)}>
@@ -293,6 +319,57 @@ impl Component for App {
                                                         html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
                                                     }).collect::<Html>() }
                                                 </div>
+                                                <div class="monuli-overview-grid" style={style_var}>
+                                                    { word_order.iter().map(|&word_index| {
+                                                        let (compact, _extra) = monuli.compact_row(word_index);
+                                                        let onselect = link.callback(move |e: MouseEvent| {
+                                                            e.prevent_default();
+                                                            Msg::SelectMonuliWord(Some(word_index))
+                                                        });
+                                                        html! {
+                                                            <div class="overview-row" onmousedown={onselect}>
+                                                                { compact.iter().map(&render_overview_cell).collect::<Html>() }
+                                                            </div>
+                                                        }
+                                                    }).collect::<Html>() }
+                                                </div>
+                                            </div>
+                                        }
+                                    } else {
+                                        // List view: single column, scrollable
+                                        let word_length = game.word_length();
+                                        let word_order = monuli.word_order();
+                                        let n_words = word_order.len();
+                                        let current_letters: Vec<char> = last_guess.chars().collect();
+                                        let mut first_solved = word_order.len();
+                                        for (pos, &idx) in word_order.iter().enumerate() {
+                                            if monuli.word_is_solved(idx) {
+                                                first_solved = pos;
+                                                break;
+                                            }
+                                        }
+
+                                        let has_overview = n_words > 10;
+                                        let on_show_all = link.callback(move |e: MouseEvent| {
+                                            e.prevent_default();
+                                            Msg::MonuliSetOverview(true)
+                                        });
+
+                                        html! {
+                                            <div class="monuli-list-view">
+                                                <div class={format!("row-{}", word_length)}>
+                                                    { (0..word_length).map(|i| {
+                                                        let c = current_letters.get(i).copied().unwrap_or(' ');
+                                                        html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
+                                                    }).collect::<Html>() }
+                                                </div>
+                                                { if has_overview {
+                                                    html! {
+                                                        <button class="monuli-back-button monuli-overview-btn" onmousedown={on_show_all}>
+                                                            {"NÄYTÄ KAIKKI"}
+                                                        </button>
+                                                    }
+                                                } else { html! {} } }
                                                 <div class="monuli-word-list">
                                                     { word_order.iter().enumerate().map(|(pos, &word_index)| {
                                                         let (compact, extra) = monuli.compact_row(word_index);

@@ -66,6 +66,7 @@ pub trait Game {
 
     /// For downcasting to concrete game type (e.g. Monuli in view).
     fn as_any(&self) -> &dyn Any;
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl PartialEq for dyn Game {

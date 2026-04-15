@@ -186,6 +186,9 @@ pub struct Monuli {
     /// When Some(i), sanuli view for word i; input applies only to that word. None = list view.
     #[serde(skip)]
     pub selected_word_index: Option<usize>,
+    /// When true and selected_word_index is None, show zoomed-out overview instead of list view.
+    #[serde(skip)]
+    pub show_overview: bool,
 }
 
 impl Default for Monuli {
@@ -346,6 +349,7 @@ impl Monuli {
             allow_profanities,
             word_lists,
             selected_word_index: None,
+            show_overview: n_words > 10,
         }
     }
 
@@ -392,6 +396,7 @@ impl Monuli {
             allow_profanities: true,
             word_lists,
             selected_word_index: None,
+            show_overview: n_words > 10,
         }
     }
 
@@ -426,6 +431,7 @@ impl Monuli {
         game.allow_profanities = allow_profanities;
         game.word_lists = word_lists;
         game.selected_word_index = None;
+        game.show_overview = game.n_words > 10;
         game.refresh();
         Ok(game)
     }
@@ -562,6 +568,9 @@ impl Game for Monuli {
     }
     fn set_monuli_selected_word(&mut self, index: Option<usize>) {
         self.selected_word_index = index;
+        if index.is_some() {
+            self.show_overview = false;
+        }
     }
     fn board_for_word(&self, word_index: usize) -> Option<Board> {
         let w = self.words.get(word_index)?;
@@ -725,6 +734,9 @@ impl Game for Monuli {
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
 
