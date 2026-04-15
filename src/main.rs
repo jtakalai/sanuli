@@ -4,8 +4,6 @@ use wasm_bindgen::{prelude::Closure, JsCast};
 use web_sys::{window, Window};
 use yew::prelude::*;
 
-use game::Game;
-
 mod components;
 mod game;
 mod manager;
@@ -255,7 +253,6 @@ impl Component for App {
                 if let Some(g) = self.manager.game.as_mut() {
                     if let Some(monuli) = g.as_any_mut().downcast_mut::<Monuli>() {
                         monuli.auto_sort = !monuli.auto_sort;
-                        let _ = monuli.persist();
                     }
                 }
             }
@@ -278,7 +275,7 @@ impl Component for App {
 
             let monuli_word_solved = if let Some(monuli) = game.as_any().downcast_ref::<Monuli>() {
                 monuli.selected_word_index
-                    .map(|idx| monuli.monuli_word_is_solved(idx))
+                    .map(|idx| monuli.word_is_solved(idx))
                     .unwrap_or(false)
             } else {
                 false

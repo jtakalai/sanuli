@@ -55,15 +55,6 @@ pub trait Game {
         vec![]
     }
 
-    /// Board for one word (Monuli sanuli view). None for other games or invalid index.
-    fn board_for_word(&self, _word_index: usize) -> Option<Board> {
-        None
-    }
-    /// Whether a specific word is solved (Monuli). Default: false.
-    fn monuli_word_is_solved(&self, _word_index: usize) -> bool {
-        false
-    }
-
     /// For downcasting to concrete game type (e.g. Monuli in view).
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
