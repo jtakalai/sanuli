@@ -625,6 +625,14 @@ header {
     border: 2px solid var(--correct);
 }
 
+.monuli-size-select {
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    text-align-last: center;
+    max-width: 90px;
+}
+
 .new-feature {
     background-color: var(--background);
     border: 2px solid var(--present);

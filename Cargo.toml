@@ -34,6 +34,7 @@ features = [
     "Storage",
     "Clipboard",
     "Navigator",
+    "HtmlSelectElement",
 ]
 
 [profile.release]

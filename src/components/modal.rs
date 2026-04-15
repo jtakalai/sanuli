@@ -1,4 +1,5 @@
 use chrono::Local;
+use wasm_bindgen::JsCast;
 use yew::prelude::*;
 
 use crate::manager::{GameMode, Theme, WordList};
@@ -134,9 +135,35 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
         onmousedown!(callback, Msg::ChangeGameMode(GameMode::DailyWord(today)));
     let change_game_mode_quadruple =
         onmousedown!(callback, Msg::ChangeGameMode(GameMode::Quadruple));
-    const MONULI_N: usize = 10;
-    let change_game_mode_monuli =
-        onmousedown!(callback, Msg::ChangeGameMode(GameMode::Monuli(MONULI_N)));
+
+    let monuli_n = use_state(|| {
+        if let GameMode::Monuli(n) = props.game_mode { n } else { 8usize }
+    });
+    let change_game_mode_monuli = {
+        let callback = callback.clone();
+        let monuli_n = monuli_n.clone();
+        Callback::from(move |e: MouseEvent| {
+            e.prevent_default();
+            callback.emit(Msg::ChangeGameMode(GameMode::Monuli(*monuli_n)));
+        })
+    };
+    let on_monuli_n_change = {
+        let callback = callback.clone();
+        let monuli_n = monuli_n.clone();
+        let game_mode = props.game_mode;
+        Callback::from(move |e: Event| {
+            if let Some(target) = e.target() {
+                if let Ok(select) = target.dyn_into::<web_sys::HtmlSelectElement>() {
+                    if let Ok(n) = select.value().parse::<usize>() {
+                        monuli_n.set(n);
+                        if matches!(game_mode, GameMode::Monuli(_)) {
+                            callback.emit(Msg::ChangeGameMode(GameMode::Monuli(n)));
+                        }
+                    }
+                }
+            }
+        })
+    };
 
     let change_word_list_easy = onmousedown!(callback, Msg::ChangeWordList(WordList::Easy));
     let change_word_list_common = onmousedown!(callback, Msg::ChangeWordList(WordList::Common));
@@ -222,14 +249,27 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
                         onmousedown={change_game_mode_quadruple}>
                         {"Neluli"}
                     </button>
-                    <button class={classes!("select", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
-                        onmousedown={change_game_mode_monuli}>
-                        {"Monuli"}
-                    </button>
+                </div>
+                <div class="select-container">
                     <button class={classes!("select", matches!(props.game_mode, GameMode::DailyWord(_)).then(|| Some("select-active")))}
                         onclick={change_game_mode_daily}>
                         {"Päivän sanuli"}
                     </button>
+                    <button class={classes!("select", matches!(props.game_mode, GameMode::Monuli(_)).then(|| Some("select-active")))}
+                        onmousedown={change_game_mode_monuli}>
+                        {"Monuli"}
+                    </button>
+                    <select class="select monuli-size-select"
+                        onchange={on_monuli_n_change}>
+                        { for [4, 8, 16, 32, 64].iter().map(|&n| {
+                            html! {
+                                <option value={n.to_string()}
+                                    selected={*monuli_n == n}>
+                                    { format!("{}kpl", n) }
+                                </option>
+                            }
+                        })}
+                    </select>
                 </div>
             </div>
             <div>
