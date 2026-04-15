@@ -688,7 +688,7 @@ impl Component for App {
 
                     {
                         if self.is_help_visible {
-                            html! { <HelpModal theme={self.manager.theme} callback={link.callback(move |msg| msg)} /> }
+                            html! { <HelpModal theme={self.manager.theme} callback={link.callback(move |msg| msg)} game_mode={self.manager.current_game_mode} /> }
                         } else {
                             html! {}
                         }

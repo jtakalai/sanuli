@@ -23,6 +23,7 @@ macro_rules! onmousedown {
 pub struct HelpModalProps {
     pub theme: Theme,
     pub callback: Callback<Msg>,
+    pub game_mode: GameMode,
 }
 
 #[function_component(HelpModal)]
@@ -41,7 +42,21 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
     html! {
         <div class="modal">
             <span onmousedown={toggle_help} class="modal-close">{"✖"}</span>
-            <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
+
+            {
+                match props.game_mode {
+                    GameMode::Quadruple => html! {
+                        <p>{"Arvaa kätketyt "}<i>{"neljä sanulia"}</i>{" yhdeksällä yrityksellä."}</p>
+                    },
+                    GameMode::Monuli(n) => html! {
+                        <p>{"Arvaa kätketyt "}<i>{format!("{} sanulia", n)}</i>{format!(" {} yrityksellä.", n + 1)}</p>
+                    },
+                    _ => html! {
+                        <p>{"Arvaa kätketty "}<i>{"sanuli"}</i>{" kuudella yrityksellä."}</p>
+                    }
+                }
+            }
+
             <p>{"Jokaisen yrityksen jälkeen arvatut kirjaimet vaihtavat väriään."}</p>
 
             <div class="row-5 example">
