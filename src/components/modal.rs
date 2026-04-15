@@ -173,7 +173,6 @@ pub fn menu_modal(props: &MenuModalProps) -> Html {
     let on_monuli_n_change = {
         let callback = callback.clone();
         let monuli_n = monuli_n.clone();
-        let game_mode = props.game_mode;
         Callback::from(move |e: Event| {
             if let Some(target) = e.target() {
                 if let Ok(select) = target.dyn_into::<web_sys::HtmlSelectElement>() {

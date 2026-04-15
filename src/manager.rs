@@ -322,15 +322,12 @@ impl Manager {
                 GameMode::Classic,
                 WordList::Common,
                 DEFAULT_WORD_LENGTH,
-                DEFAULT_MONULI_N,
+                DEFAULT_MAX_GUESSES,
                 DEFAULT_ALLOW_PROFANITIES,
                 word_lists.clone(),
             );
 
             let manager = Self {
-                current_game_mode: GameMode::Monuli(DEFAULT_MONULI_N),
-                current_word_list: WordList::Common,
-                last_monuli_n: DEFAULT_MONULI_N,
                 game: Some(Box::new(game)),
                 word_lists,
                 ..Self::default()
