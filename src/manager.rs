@@ -26,6 +26,8 @@ pub const DEFAULT_MAX_GUESSES: usize = 6;
 pub const DEFAULT_ALLOW_PROFANITIES: bool = false;
 pub const DAILY_WORD_LEN: usize = 5;
 
+pub const SUCCESS_EMOJIS: [&str; 9] = ["🥳", "🤩", "🤗", "🎉", "😊", "😺", "😎", "👏", ":3"];
+
 pub type WordLists = HashMap<(WordList, usize), HashSet<Vec<char>>>;
 
 #[derive(PartialEq, Copy, Clone)]

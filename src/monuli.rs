@@ -5,13 +5,14 @@ use std::rc::Rc;
 use gloo_storage::{errors::StorageError, LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
-use crate::game::{
-    self, KnownCounts, KnownStates, Board, Game, DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH,
-    SUCCESS_EMOJIS,
-};
+use crate::game::{self, KnownCounts, KnownStates, Board, Game};
 use crate::manager::{
-    CharacterCount, CharacterState, GameMode, KeyState, Theme, TileState, WordList, WordLists,
+    CharacterCount, CharacterState, GameMode, KeyState, TileState, WordList, WordLists,
+    DEFAULT_ALLOW_PROFANITIES, DEFAULT_WORD_LENGTH, SUCCESS_EMOJIS,
 };
+
+#[cfg(web_sys_unstable_apis)]
+use crate::manager::Theme;
 
 /// One cell in a compact row (SPEC 1.1). Each tile is either green, one or more yellows/browns, or empty.
 #[derive(Clone, Debug, PartialEq)]
@@ -790,9 +791,11 @@ impl Game for Monuli {
             }
         }
     }
+    #[cfg(web_sys_unstable_apis)]
     fn share_emojis(&self, _theme: Theme) -> Option<String> {
         None
     }
+    #[cfg(web_sys_unstable_apis)]
     fn share_link(&self) -> Option<String> {
         None
     }
