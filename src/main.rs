@@ -547,23 +547,23 @@ impl Component for App {
                                                         let render_cell = |cell: &CompactTile| -> Html {
                                                             match cell {
                                                                 CompactTile::Empty => html! {
-                                                                    <div class="compact-cell compact-cell-empty"></div>
+                                                                    <div class="compact-cell"></div>
                                                                 },
                                                                 CompactTile::Correct(c) => html! {
-                                                                    <div class="compact-cell compact-cell-green">{ c }</div>
+                                                                    <div class="compact-cell correct">{ c }</div>
                                                                 },
                                                                 CompactTile::Yellow(c) => html! {
-                                                                    <div class="compact-cell compact-cell-yellow">{ c }</div>
+                                                                    <div class="compact-cell present">{ c }</div>
                                                                 },
                                                                 CompactTile::Brown(c) => html! {
-                                                                    <div class="compact-cell compact-cell-brown">{ c }</div>
+                                                                    <div class="compact-cell maybe-present">{ c }</div>
                                                                 },
                                                                 CompactTile::Multi(ys, bs) => html! {
-                                                                    <div class="compact-cell compact-cell-yellows">
+                                                                    <div class="compact-cell compact-cell-multi">
                                                                         { ys.iter().map(|&c| html! {
-                                                                            <span class="compact-cell-yellow">{ c }</span>
+                                                                            <span class="present">{ c }</span>
                                                                         }).chain(bs.iter().map(|&c| html! {
-                                                                            <span class="compact-cell-brown">{ c }</span> })).collect::<Html>()
+                                                                            <span class="maybe-present">{ c }</span> })).collect::<Html>()
                                                                         }
                                                                     </div>
                                                                 },
@@ -592,13 +592,13 @@ impl Component for App {
                                                                         } else if extras.len() == 1 {
                                                                             let c = extras[0];
                                                                             html! {
-                                                                                <div class="compact-cell compact-cell-yellow">{ c }</div>
+                                                                                <div class="compact-cell present">{ c }</div>
                                                                             }
                                                                         } else {
                                                                             html! {
-                                                                                <div class="compact-cell compact-cell-yellows">
+                                                                                <div class="compact-cell compact-cell-multi">
                                                                                     { extras.iter().map(|&c| html! {
-                                                                                        <span class="compact-cell-yellow">{ c }</span>
+                                                                                        <span class="present">{ c }</span>
                                                                                     }).collect::<Html>()
                                                                                     }
                                                                                 </div>

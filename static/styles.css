@@ -1,5 +1,6 @@
 :root {
     --present: #c9b458;
+    --maybe-present: #62500c;
     --absent: #3e3e3e;
     --correct: #6aaa64;
     --unknown: #818384;
@@ -21,6 +22,7 @@
 .colorblind {
     --correct: #f5793a;
     --present: #85c0f9;
+    --maybe-present: #3e3e3e;
 }
 
 html {
@@ -580,43 +582,6 @@ header {
     /* Prevent selection on iOS */
 }
 
-.present {
-    background-color: var(--present);
-    border: none;
-}
-
-.absent {
-    background-color: var(--absent);
-    border: none;
-}
-
-.correct {
-    background-color: var(--correct);
-    border: none;
-}
-
-.used {
-    background-color: var(--used);
-    border: none;
-}
-
-.current {
-    background-color: var(--unknown);
-    border: none;
-}
-
-.current.present {
-    border: 5px solid var(--present);
-}
-
-.current.absent {
-    border: 5px solid var(--absent);
-}
-
-.current.correct {
-    border: 5px solid var(--correct);
-}
-
 .select-container {
     margin-top: 8px;
     margin-bottom: 16px;
@@ -838,26 +803,7 @@ header {
     box-sizing: border-box;
 }
 
-.compact-cell-empty {
-    background-color: var(--background);
-}
-
-.compact-cell-green {
-    background-color: var(--correct);
-    border: none;
-}
-
-.compact-cell-yellow {
-    background-color: var(--present);
-    border: none;
-}
-
-.compact-cell-brown {
-    background-color: #92700c;
-    border: none;
-}
-
-.compact-cell-yellows {
+.compact-cell-multi {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
@@ -868,7 +814,7 @@ header {
     font-size: 0.65rem;
 }
 
-.compact-cell-yellows>span {
+.compact-cell-multi>span {
     width: 100%;
     height: 100%;
     min-height: 0;
@@ -942,4 +888,48 @@ header {
 .monuli-overview-btn {
     margin: 4px auto;
     display: block;
+}
+
+/* Tile state colorings. Last in the CSS file so that they win over other styles, e.g. "compact-cell correct" */
+
+.present {
+    background-color: var(--present);
+    border: none;
+}
+
+.absent {
+    background-color: var(--absent);
+    border: none;
+}
+
+.correct {
+    background-color: var(--correct);
+    border: none;
+}
+
+.maybe-present {
+    background-color: var(--maybe-present);
+    border: none;
+}
+
+.used {
+    background-color: var(--used);
+    border: none;
+}
+
+.current {
+    background-color: var(--unknown);
+    border: none;
+}
+
+.current.present {
+    border: 5px solid var(--present);
+}
+
+.current.absent {
+    border: 5px solid var(--absent);
+}
+
+.current.correct {
+    border: 5px solid var(--correct);
 }

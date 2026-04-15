@@ -30,6 +30,14 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
     let callback = props.callback.clone();
     let toggle_help = onmousedown!(callback, Msg::ToggleHelp);
 
+    let color = |span_class: &'static str, text1: &'static str, text2: &'static str| html! {
+        if props.theme == Theme::Colorblind {
+            <span class={span_class}> {text1} </span>
+        } else {
+            <span class={span_class}> {text2} </span>
+        }
+    };
+
     html! {
         <div class="modal">
             <span onmousedown={toggle_help} class="modal-close">{"✖"}</span>
@@ -45,30 +53,17 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
             </div>
 
             <p>
-                {
-                    html! {
-                        if props.theme == Theme::Colorblind {
-                            <span class="present">{"Sininen"}</span>
-                        } else {
-                            <span class="present">{"Keltainen"}</span>
-                        }
-                    }
-                }
+                { color("present", "Sininen", "Keltainen") }
                 {": kirjain löytyy kätketystä sanasta, mutta on arvauksessa väärällä paikalla."}
             </p>
             <p>
-                {
-                    html! {
-                        if props.theme == Theme::Colorblind {
-                            <span class="correct">{"Oranssi"}</span>
-                        } else {
-                            <span class="correct">{"Vihreä"}</span>
-                        }
-                    }
-                }
+                { color("correct", "Oranssi", "Vihreä") }
                 {": kirjain on arvauksessa oikealla paikalla."}
             </p>
-            <p><span class="absent">{"Harmaa"}</span>{": kirjain ei löydy sanasta."}</p>
+            <p>
+                { color("absent", "Harmaa", "Harmaa") }
+                {": kirjain ei löydy sanasta."}
+            </p>
 
             <p>
                 {"Arvattaviin sanoihin käytetyn sanulistan vaikeusasteen voi valita asetuksista. Sanulistojen pohjana on käytetty
@@ -95,7 +90,17 @@ pub fn help_modal(props: &HelpModalProps) -> Html {
                 {"Nelulissa ratkaiset samalla kertaa neljää eri sanulia samoilla arvauksilla. Tavoite on saada kaikki neljä sanulia ratkaistua yhdeksällä arvauksella."}
             </p>
             <p>
-                {"Monulissa ratkaiset monta sanulia (esim. 10) samoilla arvauksilla. Yrityksiä on yksi enemmän kuin sanoja, ja ensimmäinen arvaus on aina väärä. Monulinäkymässä jokainen sana näkyy yhtenä tiivistettynä rivinä: vihreät oikeilla paikoilla, keltaiset väärillä paikoilla. Sanaa klikkaamalla aukeaa sanulinäkymä, jossa näet kaikki arvaukset kyseiselle sanalle."}
+                {"Monulissa ratkaiset monta sanulia (esim. 10) samoilla arvauksilla. Yrityksiä on yksi enemmän kuin sanoja, ja ensimmäinen arvaus on aina väärä. Monulinäkymässä jokainen sana näkyy yhtenä tiivistettynä rivinä:"}
+                {color("correct", " oranssit ", " vihreät ")}
+                {"oikeilla paikoilla,"}
+                {color("present", " siniset ", " keltaiset ")}
+                {"ja"}
+                {color("maybe-present", " harmaat ", " ruskeat ")}
+                {"väärillä paikoilla."}
+                {color("present", " Siniset ", " Keltaiset ")}
+                {"ovat sanassa,"}
+                {color("maybe-present", " harmaat ", " ruskeat ")}
+                {"vain ehkä. Sanaa klikkaamalla aukeaa tuttu sanulinäkymä, jossa näet kaikki arvaukset kyseiselle sanalle."}
             </p>
             <p>
                 {"Sanulistoja muokkailen aina välillä käyttäjien ehdotusten perusteella, ja voit jättää omat ehdotuksesi sanuleihin "}
