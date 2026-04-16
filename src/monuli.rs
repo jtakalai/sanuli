@@ -572,10 +572,10 @@ impl Game for Monuli {
         self.allow_profanities = is_allowed;
     }
     fn title(&self) -> String {
-        let guess_num_str = if self.current_guess < self.max_guesses() {
+        let guess_num_str = if self.is_guessing() {
             format!(" ({}/{})", self.current_guess + 1, self.max_guesses())
         } else {
-            String::new()
+            format!(" ({}/{})", self.current_guess, self.max_guesses())
         };
         let best_score_str = if self.best_score > 0 {
             format!(" — Paras: {}", self.best_score)
