@@ -1,6 +1,15 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## v2.0 - 2026-04-17
+
+### Added
+- Monuli mode: more simultaneous words than 4
+- Keyboard navigation (monuli tends to overflow the screen)
+
+### Changed
+- Lints fixed ;)
+
 ## v1.14 - 2022-02-19
 
 ### Changed
