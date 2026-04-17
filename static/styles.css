@@ -699,38 +699,40 @@ header {
 }
 
 /* Monuli list view */
-.monuli-list-view {
+.monuli-list-layout {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    margin: 0 auto;
+}
+
+.monuli-stats-sidebar {
+    max-width: 50px;
+    padding: 53px 0;
+}
+
+.monuli-list-main {
+    flex-grow: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
-    padding: 8px 0;
-    flex-grow: 1;
     overflow: hidden;
-    width: 100%;
-}
-
-.monuli-list-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    padding: 4px 12px;
-    box-sizing: border-box;
-    background-color: var(--background);
-    border-bottom: 1px solid var(--absent);
-    margin-bottom: 8px;
+    gap: 8px;
 }
 
 .monuli-stats {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    gap: 30px;
+    width: 100%;
 }
 
 .monuli-stat-item {
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
 
 .monuli-stat-item .label {
@@ -748,24 +750,22 @@ header {
 }
 
 .monuli-sort-toggle {
+    width: 50px;
+    height: 25px;
+    margin-top: 5px;
     background: var(--unknown);
     border: none;
     color: var(--white);
     font-weight: bold;
     font-size: 0.7rem;
-    padding: 6px 10px;
     cursor: pointer;
     border-radius: 4px;
     text-transform: uppercase;
     transition: background 0.2s;
 }
 
-.monuli-sort-toggle.active {
-    background: var(--correct);
-}
-
-.monuli-sort-toggle:hover {
-    background: var(--absent);
+.monuli-list-view {
+    height: 100%;
 }
 
 .monuli-list-view>.row-5,

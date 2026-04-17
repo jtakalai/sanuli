@@ -89,6 +89,9 @@ pub fn monuli_view(props: &Props) -> Html {
                                 }
                             }
                         }
+                        "ArrowLeft" => {
+                            callback.emit(Msg::SetMonuliSelection(None));
+                        }
                         "Enter" => {
                             // other cases are handled in main.rs:update
                             match monuli_clone.enter_button_state() {
@@ -193,124 +196,125 @@ pub fn monuli_view(props: &Props) -> Html {
 
         html! {
             <div class="monuli-list-view">
-                <div class="monuli-list-header">
-                    <div class="monuli-stats">
-                        <div class="monuli-stat-item">
-                            <span class="label">{"Yritys"}</span>
-                            <span class="value">{ format!("{}/{}", if monuli.is_guessing() { monuli.current_guess + 1 } else { monuli.current_guess }, monuli.max_guesses()) }</span>
+                <div class="monuli-list-layout">
+                    <div class="monuli-stats-sidebar">
+                        <div class="monuli-stats">
+                            <div class="monuli-stat-item">
+                                <span class="label">{"Arvaus"}</span>
+                                <span class="value">{ format!("{}/{}", if monuli.is_guessing() { monuli.current_guess + 1 } else { monuli.current_guess }, monuli.max_guesses()) }</span>
+                            </div>
+                            <div class="monuli-stat-item">
+                                <span class="label">{"Paras tulos"}</span>
+                                <span class="value">{ if monuli.best_score > 0 { monuli.best_score.to_string() } else { "-".to_string() } }</span>
+                            </div>
+                            <div class="monuli-stat-item">
+                                <span class="label">{"Monuli- putki"}</span>
+                                <span class="value">{ monuli.streak }</span>
+                            </div>
+                            <div class="monuli-stat-item">
+                                <span class="label">{"Järjestä sanat"}</span>
+                                <button class={classes!("monuli-sort-toggle", if *auto_sort { "active" } else { "" })}
+                                        onmousedown={on_toggle_sort}>
+                                    { if *auto_sort { "ON" } else { "OFF" } }
+                                </button>
+                            </div>
                         </div>
-                        { if monuli.best_score > 0 {
-                            html! {
-                                <div class="monuli-stat-item">
-                                    <span class="label">{"Paras"}</span>
-                                    <span class="value">{ monuli.best_score }</span>
-                                </div>
-                            }
-                        } else { html! {} } }
-                        { if monuli.streak > 0 {
-                            html! {
-                                <div class="monuli-stat-item">
-                                    <span class="label">{"Putki"}</span>
-                                    <span class="value">{ monuli.streak }</span>
-                                </div>
-                            }
-                        } else { html! {} } }
                     </div>
-                    <button class={classes!("monuli-sort-toggle", if *auto_sort { "active" } else { "" })}
-                            onmousedown={on_toggle_sort}>
-                        { if *auto_sort { "Lajittelu: Päällä" } else { "Lajittelu: Pois" } }
-                    </button>
-                </div>
-                <div class={format!("row-{}", word_length)}>
-                    { (0..word_length).map(|i| {
-                        let c = current_letters.get(i).copied().unwrap_or(' ');
-                        html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
-                    }).collect::<Html>() }
-                </div>
-                <div class="monuli-word-list">
-                    { word_order.iter().enumerate().map(|(pos, &word_index)| {
-                        let (compact, extras) = monuli.compact_row(word_index);
-                        let is_first_solved = pos == first_solved && first_solved < word_order.len();
-                        let callback = props.callback.clone();
-                        let onselect = Callback::from(move |e: MouseEvent| {
-                            e.prevent_default();
-                            callback.emit(Msg::SetMonuliSelection(Some(word_index)));
-                        });
-                        let render_cell = |cell: &CompactTile| -> Html {
-                            match cell {
-                                CompactTile::Empty => html! {
-                                    <div class="compact-cell"></div>
-                                },
-                                CompactTile::Absent(c) => html! {
-                                    <div class="compact-cell absent">{ c }</div>
-                                },
-                                CompactTile::Correct(c) => html! {
-                                    <div class="compact-cell correct">{ c }</div>
-                                },
-                                CompactTile::Present(c) => html! {
-                                    <div class="compact-cell present">{ c }</div>
-                                },
-                                CompactTile::MaybePresent(c) => html! {
-                                    <div class="compact-cell maybe-present">{ c }</div>
-                                },
-                                CompactTile::Multi(ps, mps, aas) => html! {
-                                    <div class="compact-cell compact-cell-multi">
-                                        {
-                                            ps.iter().sorted().map(|&c| html! {
-                                                <span class="present">{ c }</span>
-                                            }).chain(mps.iter().sorted().map(|&c| html! {
-                                                <span class="maybe-present">{ c }</span>
-                                            })).chain(aas.iter().sorted().map(|&c| html! {
-                                                <span class="absent">{ c }</span>
-                                            })).collect::<Html>()
-                                        }
-                                    </div>
-                                },
-                            }
-                        };
-                        let is_cursor = *list_cursor == Some(pos);
-                        let row_class = if is_cursor {
-                            format!("row-{} monuli-compact-row monuli-row-selected", word_length)
-                        } else {
-                            format!("row-{} monuli-compact-row", word_length)
-                        };
-                        html! {
-                            <>
-                                { if is_first_solved {
-                                    html! { <div class="monuli-separator">{"Ratkaistut sanulit"}</div> }
-                                } else { html! {} } }
-                                <div class={row_class}
-                                     onmousedown={onselect}>
-                                    <div class="compact-cells-side"></div>
-                                    <div class="compact-cells-main">
-                                        { compact.iter().map(&render_cell).collect::<Html>() }
-                                    </div>
-                                    <div class="compact-cells-side">
-                                        { if extras.len() == 0 {
-                                            html! {}
-                                        } else if extras.len() == 1 {
-                                            let c = extras.iter().next().unwrap();
-                                            html! {
-                                                <div class="compact-cell present">{ c }</div>
-                                            }
-                                        } else {
-                                            html! {
-                                                <div class="compact-cell compact-cell-multi">
-                                                    { extras.iter().sorted().map(|&c| html! {
+                    <div class="monuli-list-main">
+                        <div class={format!("row-{} monuli-compact-row", word_length)} style="cursor: default;">
+                            <div class="compact-cells-main">
+                                { (0..word_length).map(|i| {
+                                    let c = current_letters.get(i).copied().unwrap_or(' ');
+                                    html! { <div class={classes!("tile", "current", "unknown")}>{ c }</div> }
+                                }).collect::<Html>() }
+                            </div>
+                            <div class="compact-cells-side"></div>
+                        </div>
+                        <div class="monuli-word-list">
+                            { word_order.iter().enumerate().map(|(pos, &word_index)| {
+                                let (compact, extras) = monuli.compact_row(word_index);
+                                let is_first_solved = pos == first_solved && first_solved < word_order.len();
+                                let callback = props.callback.clone();
+                                let onselect = Callback::from(move |e: MouseEvent| {
+                                    e.prevent_default();
+                                    callback.emit(Msg::SetMonuliSelection(Some(word_index)));
+                                });
+                                let render_cell = |cell: &CompactTile| -> Html {
+                                    match cell {
+                                        CompactTile::Empty => html! {
+                                            <div class="compact-cell"></div>
+                                        },
+                                        CompactTile::Absent(c) => html! {
+                                            <div class="compact-cell absent">{ c }</div>
+                                        },
+                                        CompactTile::Correct(c) => html! {
+                                            <div class="compact-cell correct">{ c }</div>
+                                        },
+                                        CompactTile::Present(c) => html! {
+                                            <div class="compact-cell present">{ c }</div>
+                                        },
+                                        CompactTile::MaybePresent(c) => html! {
+                                            <div class="compact-cell maybe-present">{ c }</div>
+                                        },
+                                        CompactTile::Multi(ps, mps, aas) => html! {
+                                            <div class="compact-cell compact-cell-multi">
+                                                {
+                                                    ps.iter().sorted().map(|&c| html! {
                                                         <span class="present">{ c }</span>
-                                                    }).collect::<Html>()
+                                                    }).chain(mps.iter().sorted().map(|&c| html! {
+                                                        <span class="maybe-present">{ c }</span>
+                                                    })).chain(aas.iter().sorted().map(|&c| html! {
+                                                        <span class="absent">{ c }</span>
+                                                    })).collect::<Html>()
+                                                }
+                                            </div>
+                                        },
+                                    }
+                                };
+                                let is_cursor = *list_cursor == Some(pos);
+                                let row_class = if is_cursor {
+                                    format!("row-{} monuli-compact-row monuli-row-selected", word_length)
+                                } else {
+                                    format!("row-{} monuli-compact-row", word_length)
+                                };
+                                html! {
+                                    <>
+                                        { if is_first_solved {
+                                            html! { <div class="monuli-separator">{"Ratkaistut sanulit"}</div> }
+                                        } else { html! {} } }
+                                        <div class={row_class}
+                                             onmousedown={onselect}>
+                                            <div class="compact-cells-main">
+                                                { compact.iter().map(&render_cell).collect::<Html>() }
+                                            </div>
+                                            <div class="compact-cells-side">
+                                                { if extras.len() == 0 {
+                                                    html! {}
+                                                } else if extras.len() == 1 {
+                                                    let c = extras.iter().next().unwrap();
+                                                    html! {
+                                                        <div class="compact-cell present">{ c }</div>
                                                     }
-                                                </div>
-                                            }
-                                        } }
-                                    </div>
-                                    { if is_cursor {
-                                        html! { <div class="monuli-row-arrow">{"→"}</div> }
-                                    } else { html! {} } }
-                                </div>
-                            </>
-                        }
-                    }).collect::<Html>() }
+                                                } else {
+                                                    html! {
+                                                        <div class="compact-cell compact-cell-multi">
+                                                            { extras.iter().sorted().map(|&c| html! {
+                                                                <span class="present">{ c }</span>
+                                                            }).collect::<Html>()
+                                                            }
+                                                        </div>
+                                                    }
+                                                } }
+                                            </div>
+                                            { if is_cursor {
+                                                html! { <div class="monuli-row-arrow">{"→"}</div> }
+                                            } else { html! {} } }
+                                        </div>
+                                    </>
+                                }
+                            }).collect::<Html>() }
+                        </div>
+                    </div>
                 </div>
             </div>
         }
