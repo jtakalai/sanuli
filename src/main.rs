@@ -143,10 +143,10 @@ impl Component for App {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
             }
-            Msg::SetMonuliSelection(idx) => {
+            Msg::SetMonuliSelection(maybe_word_index) => {
                 if let Some(game) = &mut self.manager.game {
                     if let Some(monuli) = game.as_monuli_mut() {
-                        monuli.selected_word_index = idx;
+                        monuli.selected_word_index = maybe_word_index;
                     }
                 }
             }

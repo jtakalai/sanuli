@@ -6,7 +6,6 @@ use web_sys::window;
 use wasm_bindgen::JsCast;
 
 use crate::Msg;
-use crate::manager::EnterButton;
 use crate::monuli::{Monuli, CompactTile};
 use crate::game::Game;
 use crate::components::board::Board;
@@ -35,21 +34,19 @@ pub fn monuli_view(props: &Props) -> Html {
         let callback = props.callback.clone();
 
         use_effect_with(
-            (list_cursor.clone(), *auto_sort),
-            move |&(ref list_cursor_handle, auto_sort_val)| {
+            (list_cursor.clone(), *auto_sort, monuli.selected_word_index, monuli.current_guess),
+            move |&(ref list_cursor_handle, auto_sort_val, _selected_word_idx, _current_guess)| {
                 let list_cursor_val = **list_cursor_handle;
 
                 let listener = EventListener::new(&window().unwrap(), "keydown", move |event| {
-                    if monuli_clone.selected_word_index.is_some() {
-                        return;
-                    }
-
                     let event = event.dyn_ref::<web_sys::KeyboardEvent>().unwrap();
                     let key = event.key();
+                    let key = key.as_str();
 
                     let mut handled = true;
-                    match key.as_str() {
-                        "ArrowUp" => {
+                    if monuli_clone.selected_word_index.is_none() {
+                        // list view
+                        if key == "ArrowUp" {
                             let order = monuli_clone.word_order(auto_sort_val);
                             let n = if !monuli_clone.is_guessing() {
                                 order.len()
@@ -64,8 +61,7 @@ pub fn monuli_view(props: &Props) -> Html {
                                 };
                                 list_cursor_clone.set(new_val);
                             }
-                        }
-                        "ArrowDown" => {
+                        } else if key == "ArrowDown" {
                             let order = monuli_clone.word_order(auto_sort_val);
                             let n = if !monuli_clone.is_guessing() {
                                 order.len()
@@ -80,28 +76,23 @@ pub fn monuli_view(props: &Props) -> Html {
                                 };
                                 list_cursor_clone.set(new_val);
                             }
-                        }
-                        "ArrowRight" => {
-                            if let Some(cursor) = list_cursor_val {
-                                let order = monuli_clone.word_order(auto_sort_val);
-                                if let Some(&word_index) = order.get(cursor) {
-                                    callback.emit(Msg::SetMonuliSelection(Some(word_index)));
+                        } else if key == "ArrowRight" {
+                            if monuli_clone.selected_word_index.is_none() {
+                                if let Some(cursor) = list_cursor_val {
+                                    let order = monuli_clone.word_order(auto_sort_val);
+                                    if let Some(&word_index) = order.get(cursor) {
+                                        callback.emit(Msg::SetMonuliSelection(Some(word_index)));
+                                    }
                                 }
                             }
+                        } else {
+                            handled = false;
                         }
-                        "ArrowLeft" => {
+                    } else {
+                        // individual sanuli view
+                        if key == "ArrowLeft" {
                             callback.emit(Msg::SetMonuliSelection(None));
-                        }
-                        "Enter" => {
-                            // other cases are handled in main.rs:update
-                            match monuli_clone.enter_button_state() {
-                                EnterButton::MonuliReturnToListView => {
-                                    callback.emit(Msg::SetMonuliSelection(None));
-                                }
-                                _ => {}
-                            }
-                        }
-                        _ => {
+                        } else {
                             handled = false;
                         }
                     }

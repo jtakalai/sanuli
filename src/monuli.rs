@@ -628,10 +628,18 @@ impl Game for Monuli {
     }
 
     fn enter_button_state(&self) -> EnterButton {
-        if self.is_guessing() {
-            EnterButton::SubmitGuess
+        if let Some(word_index) = self.selected_word_index {
+            if !self.word_is_solved(word_index) {
+                EnterButton::SubmitGuess
+            } else {
+                EnterButton::MonuliReturnToListView
+            }
         } else {
-            EnterButton::RestartGame
+            if self.is_guessing() {
+                EnterButton::SubmitGuess
+            } else {
+                EnterButton::RestartGame
+            }
         }
     }
 
