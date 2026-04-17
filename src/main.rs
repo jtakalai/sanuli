@@ -42,6 +42,9 @@ pub enum Msg {
     ShareLink,
     RevealHiddenTiles,
     ResetGame,
+
+    // this Msg was necessary because Keyboard must look different depending on selected word
+    SetMonuliSelection(Option<usize>),
 }
 
 pub struct App {
@@ -139,6 +142,13 @@ impl Component for App {
             Msg::ToggleHelp => {
                 self.is_help_visible = !self.is_help_visible;
                 self.is_menu_visible = false;
+            }
+            Msg::SetMonuliSelection(idx) => {
+                if let Some(game) = &mut self.manager.game {
+                    if let Some(monuli) = game.as_monuli_mut() {
+                        monuli.selected_word_index = idx;
+                    }
+                }
             }
             Msg::ToggleMenu => {
                 self.is_menu_visible = !self.is_menu_visible;

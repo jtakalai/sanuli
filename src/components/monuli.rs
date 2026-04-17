@@ -27,20 +27,20 @@ pub fn monuli_view(props: &Props) -> Html {
     });
 
     let list_cursor = use_state(|| None::<usize>);
-    let selected_word_index = use_state(|| None::<usize>);
 
     // Handle key events for list navigation
     {
-        let monuli = monuli.clone();
+        let monuli_clone = monuli.clone();
         let list_cursor_clone = list_cursor.clone();
-        let selected_word_index_clone = selected_word_index.clone();
+        let callback = props.callback.clone();
+
         use_effect_with(
-            (list_cursor.clone(), (*selected_word_index).clone(), *auto_sort),
-            move |&(ref list_cursor_handle, selected_val, auto_sort_val)| {
+            (list_cursor.clone(), *auto_sort),
+            move |&(ref list_cursor_handle, auto_sort_val)| {
                 let list_cursor_val = **list_cursor_handle;
 
                 let listener = EventListener::new(&window().unwrap(), "keydown", move |event| {
-                    if selected_val.is_some() {
+                    if monuli_clone.selected_word_index.is_some() {
                         return;
                     }
 
@@ -50,11 +50,11 @@ pub fn monuli_view(props: &Props) -> Html {
                     let mut handled = true;
                     match key.as_str() {
                         "ArrowUp" => {
-                            let order = monuli.word_order(auto_sort_val);
-                            let n = if !monuli.is_guessing() {
+                            let order = monuli_clone.word_order(auto_sort_val);
+                            let n = if !monuli_clone.is_guessing() {
                                 order.len()
                             } else {
-                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
+                                order.iter().filter(|&&i| !monuli_clone.word_is_solved(i)).count()
                             };
                             if n > 0 {
                                 let new_val = match list_cursor_val {
@@ -66,11 +66,11 @@ pub fn monuli_view(props: &Props) -> Html {
                             }
                         }
                         "ArrowDown" => {
-                            let order = monuli.word_order(auto_sort_val);
-                            let n = if !monuli.is_guessing() {
+                            let order = monuli_clone.word_order(auto_sort_val);
+                            let n = if !monuli_clone.is_guessing() {
                                 order.len()
                             } else {
-                                order.iter().filter(|&&i| !monuli.word_is_solved(i)).count()
+                                order.iter().filter(|&&i| !monuli_clone.word_is_solved(i)).count()
                             };
                             if n > 0 {
                                 let new_val = match list_cursor_val {
@@ -83,17 +83,17 @@ pub fn monuli_view(props: &Props) -> Html {
                         }
                         "ArrowRight" => {
                             if let Some(cursor) = list_cursor_val {
-                                let order = monuli.word_order(auto_sort_val);
+                                let order = monuli_clone.word_order(auto_sort_val);
                                 if let Some(&word_index) = order.get(cursor) {
-                                    selected_word_index_clone.set(Some(word_index));
+                                    callback.emit(Msg::SetMonuliSelection(Some(word_index)));
                                 }
                             }
                         }
                         "Enter" => {
                             // other cases are handled in main.rs:update
-                            match monuli.enter_button_state() {
+                            match monuli_clone.enter_button_state() {
                                 EnterButton::MonuliReturnToListView => {
-                                    selected_word_index_clone.set(None);
+                                    callback.emit(Msg::SetMonuliSelection(None));
                                 }
                                 _ => {}
                             }
@@ -113,32 +113,36 @@ pub fn monuli_view(props: &Props) -> Html {
     }
 
     // Scroll handling
-    use_effect_with((selected_word_index.clone(), list_cursor.clone()), move |(selected, cursor)| {
-        if selected.is_some() {
-            // When entering Sanuli view, scroll to bottom if many guesses
-            if let Some(board) = window()
-                .and_then(|w| w.document())
-                .and_then(|d| d.get_element_by_id("game-board"))
-            {
-                board.set_scroll_top(board.scroll_height());
+    {
+        let selected_word_index = monuli.selected_word_index;
+        use_effect_with(list_cursor.clone(), move |cursor| {
+            if selected_word_index.is_some() {
+                // When entering Sanuli view, scroll to bottom if many guesses
+                if let Some(board) = window()
+                    .and_then(|w| w.document())
+                    .and_then(|d| d.get_element_by_id("game-board"))
+                {
+                    board.set_scroll_top(board.scroll_height());
+                }
+            } else if cursor.is_some() {
+                // Ensure the cursor row is visible in list view
+                if let Some(row) = window()
+                    .and_then(|w| w.document())
+                    .and_then(|d| d.get_elements_by_class_name("monuli-row-selected").item(0))
+                {
+                    row.scroll_into_view_with_bool(false);
+                }
             }
-        } else if cursor.is_some() {
-            // Ensure the cursor row is visible in list view
-            if let Some(row) = window()
-                .and_then(|w| w.document())
-                .and_then(|d| d.get_elements_by_class_name("monuli-row-selected").item(0))
-            {
-                row.scroll_into_view_with_bool(false);
-            }
-        }
-    });
+        });
+    }
 
-    if let Some(word_idx) = *selected_word_index {
+    if let Some(word_idx) = monuli.selected_word_index {
         // Sanuli view for a single word
         if let Some(game_board) = monuli.board_for_word(word_idx) {
+            let callback = props.callback.clone();
             let onmousedown = Callback::from(move |e: MouseEvent| {
                 e.prevent_default();
-                selected_word_index.set(None);
+                callback.emit(Msg::SetMonuliSelection(None));
             });
             html! {
                 <>
@@ -227,10 +231,10 @@ pub fn monuli_view(props: &Props) -> Html {
                     { word_order.iter().enumerate().map(|(pos, &word_index)| {
                         let (compact, extras) = monuli.compact_row(word_index);
                         let is_first_solved = pos == first_solved && first_solved < word_order.len();
-                        let selected_word_index = selected_word_index.clone();
+                        let callback = props.callback.clone();
                         let onselect = Callback::from(move |e: MouseEvent| {
                             e.prevent_default();
-                            selected_word_index.set(Some(word_index));
+                            callback.emit(Msg::SetMonuliSelection(Some(word_index)));
                         });
                         let render_cell = |cell: &CompactTile| -> Html {
                             match cell {

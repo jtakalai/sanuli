@@ -220,6 +220,10 @@ pub struct Monuli {
     allow_profanities: bool,
     #[serde(skip)]
     pub word_lists: Rc<WordLists>,
+
+    /// When Some(i), show sanuli view for word i; input applies only to that word. None = list view.
+    #[serde(skip)]
+    pub selected_word_index: Option<usize>,
 }
 
 impl Monuli {
@@ -440,6 +444,7 @@ impl Monuli {
             streak: 0,
             best_score: 0,
             message: String::new(),
+            selected_word_index: None,
             allow_profanities: DEFAULT_ALLOW_PROFANITIES,
             word_lists,
         }
@@ -572,37 +577,52 @@ impl Game for Monuli {
         let _ = self.persist();
     }
     fn keyboard_tilestate(&self, key: &char) -> KeyState {
-        // List view: used = light blue, absent from all unsolved = black.
-        let used: HashSet<char> = self
-            .words
-            .iter()
-            .flat_map(|w| {
-                w.guesses
-                    .iter()
-                    .take(self.current_guess + 1)
-                    .flat_map(|row| row.iter().map(|(c, _)| *c))
-            })
-            .collect();
-        if used.contains(key) {
-            let unsolved = self
+        if let Some(word_index) = self.selected_word_index {
+            match self.words.get(word_index) {
+                Some(w) => {
+                    let idx = self.current_guess.min(w.known_states.len() - 1);
+                    return KeyState::Single(game::keyboard_tile_state(
+                        key,
+                        idx,
+                        &w.known_states,
+                        &w.known_counts,
+                    ));
+                }
+                None => return KeyState::Single(TileState::Unknown),
+            }
+        } else {
+            // List view: used = light blue, absent from all unsolved = black.
+            let used: HashSet<char> = self
                 .words
                 .iter()
-                .filter(|w| !w.is_solved())
-                .collect::<Vec<_>>();
-            if unsolved.is_empty() {
-                return KeyState::Single(TileState::Used);
+                .flat_map(|w| {
+                    w.guesses
+                        .iter()
+                        .take(self.current_guess + 1)
+                        .flat_map(|row| row.iter().map(|(c, _)| *c))
+                })
+                .collect();
+            if used.contains(key) {
+                let unsolved = self
+                    .words
+                    .iter()
+                    .filter(|w| !w.is_solved())
+                    .collect::<Vec<_>>();
+                if unsolved.is_empty() {
+                    return KeyState::Single(TileState::Used);
+                }
+                let absent_from_all = unsolved.iter().all(|w| {
+                    w.known_counts
+                        .get(self.current_guess.min(w.known_counts.len() - 1))
+                        .and_then(|m| m.get(key))
+                        == Some(&CharacterCount::Exactly(0))
+                });
+                return KeyState::Single(if absent_from_all {
+                    TileState::Absent
+                } else {
+                    TileState::Used
+                });
             }
-            let absent_from_all = unsolved.iter().all(|w| {
-                w.known_counts
-                    .get(self.current_guess.min(w.known_counts.len() - 1))
-                    .and_then(|m| m.get(key))
-                    == Some(&CharacterCount::Exactly(0))
-            });
-            return KeyState::Single(if absent_from_all {
-                TileState::Absent
-            } else {
-                TileState::Used
-            });
         }
         KeyState::Single(TileState::Unknown)
     }
@@ -616,6 +636,10 @@ impl Game for Monuli {
     }
 
     fn as_monuli(&self) -> Option<&Monuli> {
+        Some(self)
+    }
+
+    fn as_monuli_mut(&mut self) -> Option<&mut Monuli> {
         Some(self)
     }
 

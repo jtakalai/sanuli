@@ -54,11 +54,8 @@ pub trait Game {
     fn enter_button_state(&self) -> EnterButton;
 
     /// Special handling for Monuli in main.rs
-    /// TODO: could we do some unsafe cast according to GameMode to avoid this?
-    ///   Maybe passing just Game to MonuliView then unsafe cast Game->Monuli there?
-    fn as_monuli(&self) -> Option<&Monuli> {
-        None
-    }
+    fn as_monuli(&self) -> Option<&Monuli> { None }
+    fn as_monuli_mut(&mut self) -> Option<&mut Monuli> { None }
 }
 
 impl PartialEq for dyn Game {
@@ -240,6 +237,7 @@ pub fn hint_tile_state(
     }
 }
 
+/// Default sanuli keyboard coloring
 pub fn keyboard_tile_state(
     key: &char,
     current_guess: usize,
