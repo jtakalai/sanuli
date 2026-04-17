@@ -2,7 +2,9 @@ use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use gloo_storage::{errors::StorageError, LocalStorage, Storage};
+use gloo_storage::errors::StorageError;
+#[cfg(target_arch = "wasm32")]
+use gloo_storage::{LocalStorage, Storage};
 use serde::{Deserialize, Serialize};
 
 use crate::game::{self, KnownCounts, KnownStates, Board, Game};
@@ -457,13 +459,14 @@ impl Monuli {
         allow_profanities: bool,
         word_lists: Rc<WordLists>,
     ) -> Self {
+        #[cfg(target_arch = "wasm32")]
         if let Ok(game) = Self::rehydrate(n_words, word_list, word_length, allow_profanities, word_lists.clone()) {
-            game
-        } else {
-            Self::new(word_list, word_length, n_words, allow_profanities, word_lists)
+            return game;
         }
+        Self::new(word_list, word_length, n_words, allow_profanities, word_lists)
     }
 
+    #[cfg(target_arch = "wasm32")]
     fn rehydrate(
         n_words: usize,
         word_list: WordList,
@@ -500,6 +503,7 @@ impl Monuli {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
     fn localstorage_key(n_words: usize, word_list: WordList, word_length: usize) -> String {
         format!(
             "game|monuli|{}|{}|{}",
@@ -805,8 +809,15 @@ impl Game for Monuli {
     }
 
     fn persist(&self) -> Result<(), StorageError> {
-        let game_key = Self::localstorage_key(self.n_words, self.word_list, self.word_length);
-        LocalStorage::set(game_key, self)
+        #[cfg(target_arch = "wasm32")]
+        {
+            let game_key = Self::localstorage_key(self.n_words, self.word_list, self.word_length);
+            LocalStorage::set(game_key, self)
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Ok(())
+        }
     }
 }
 
