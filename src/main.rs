@@ -255,6 +255,7 @@ impl Component for App {
                                         previous_guesses={game.previous_guesses().clone()}
                                         max_guesses={game.max_guesses()}
                                         word_length={game.word_length()}
+                                        board_class="board-6"
                                     />
                                 </div>
                             }
@@ -273,6 +274,7 @@ impl Component for App {
                                                     previous_guesses={game.previous_guesses().clone()}
                                                     max_guesses={game.max_guesses()}
                                                     word_length={game.word_length()}
+                                                    board_class="board-9"
                                                 />
                                             }
                                         }).collect::<Html>()}
