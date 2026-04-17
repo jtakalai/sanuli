@@ -515,7 +515,7 @@ header {
     animation-duration: 1.2s;
 }
 
-@media (max-width:375px) {
+@media (max-width: 375px) {
     .board-container {
         align-items: flex-start;
     }
