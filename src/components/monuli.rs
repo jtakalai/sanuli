@@ -116,7 +116,7 @@ pub fn monuli_view(props: &Props) -> Html {
                     .and_then(|w| w.document())
                     .and_then(|d| d.get_element_by_id("game-board"))
                 {
-                    board.set_scroll_top(board.scroll_height());
+                    board.set_scroll_top(board.scroll_height().into());
                 }
             } else if cursor.is_some() {
                 // Ensure the cursor row is visible in list view
