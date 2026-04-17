@@ -543,6 +543,12 @@ header {
     }
 }
 
+@media (max-width: 420px) {
+    .compact-cells-side {
+        padding-left: 0px !important;
+    }
+}
+
 @media (max-height:700px) {
     .board-container {
         align-items: flex-start;
